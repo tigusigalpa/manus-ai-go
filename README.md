@@ -1,6 +1,9 @@
 # Manus AI Go SDK
 
-🚀 Complete Go library for integration with [Manus AI](https://manus.ai) API. Easily integrate Manus AI agent into your Go applications.
+![Manus AI Golang SDK](https://github.com/user-attachments/assets/7ab45f09-b62b-4983-a5ce-f120ecdf150a)
+
+🚀 Complete Go library for integration with [Manus AI](https://manus.ai) API. Easily integrate Manus AI agent into your
+Go applications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.21-blue)](https://golang.org/)
@@ -15,10 +18,10 @@
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
-  - [Basic Usage](#basic-usage)
-  - [Task Management](#task-management)
-  - [File Management](#file-management)
-  - [Webhooks](#webhooks)
+    - [Basic Usage](#basic-usage)
+    - [Task Management](#task-management)
+    - [File Management](#file-management)
+    - [Webhooks](#webhooks)
 - [API Reference](#api-reference)
 - [Examples](#examples)
 - [Testing](#testing)
@@ -118,7 +121,8 @@ func main() {
 
 ### Task Management
 
-Tasks are the core of Manus AI - they represent AI agent work items that can perform complex operations, answer questions, or automate workflows.
+Tasks are the core of Manus AI - they represent AI agent work items that can perform complex operations, answer
+questions, or automate workflows.
 
 **API Documentation:** [Tasks API Reference](https://open.manus.ai/docs/api-reference/create-task)
 
@@ -138,6 +142,7 @@ if err != nil {
 ```
 
 **Available Agent Profiles:**
+
 - `AgentProfileManus16` - Latest and most capable model (recommended)
 - `AgentProfileManus16Lite` - Faster, lightweight version
 - `AgentProfileManus16Max` - Maximum capability version
@@ -223,7 +228,8 @@ fmt.Printf("Deleted: %v\n", result.Deleted)
 
 ### File Management
 
-Manus AI supports file attachments to provide context for your tasks. The file upload process uses a two-step approach: first, create a file record to get a secure presigned URL, then upload your content directly to cloud storage.
+Manus AI supports file attachments to provide context for your tasks. The file upload process uses a two-step approach:
+first, create a file record to get a secure presigned URL, then upload your content directly to cloud storage.
 
 **API Documentation:** [Files API Reference](https://open.manus.ai/docs/api-reference/create-file)
 
@@ -298,7 +304,8 @@ if err != nil {
 
 ### Webhooks
 
-Webhooks enable real-time notifications about your task lifecycle events. Instead of polling for updates, Manus AI will send HTTP POST requests to your specified endpoint whenever important events occur.
+Webhooks enable real-time notifications about your task lifecycle events. Instead of polling for updates, Manus AI will
+send HTTP POST requests to your specified endpoint whenever important events occur.
 
 **API Documentation:** [Webhooks Guide](https://open.manus.ai/docs/webhooks/index)
 
@@ -377,6 +384,7 @@ if err != nil {
 ### Client Methods
 
 #### Task Methods
+
 - `CreateTask(prompt string, options *TaskOptions) (*TaskResponse, error)`
 - `GetTasks(filters *TaskFilters) (*TaskListResponse, error)`
 - `GetTask(taskID string) (*TaskDetail, error)`
@@ -384,6 +392,7 @@ if err != nil {
 - `DeleteTask(taskID string) (*DeleteResponse, error)`
 
 #### File Methods
+
 - `CreateFile(filename string) (*FileResponse, error)`
 - `UploadFileContent(uploadURL string, fileContent []byte, contentType string) error`
 - `ListFiles() (*FileListResponse, error)`
@@ -391,24 +400,28 @@ if err != nil {
 - `DeleteFile(fileID string) (*DeleteResponse, error)`
 
 #### Webhook Methods
+
 - `CreateWebhook(webhook *WebhookConfig) (*WebhookResponse, error)`
 - `DeleteWebhook(webhookID string) error`
 
 ### Helper Functions
 
 #### Agent Profile
+
 - `AllAgentProfiles() []string` - Get all available profiles
 - `RecommendedAgentProfiles() []string` - Get recommended profiles
 - `IsValidAgentProfile(profile string) bool` - Check if profile is valid
 - `IsDeprecatedAgentProfile(profile string) bool` - Check if profile is deprecated
 
 #### Attachments
+
 - `NewAttachmentFromFileID(fileID string) map[string]interface{}`
 - `NewAttachmentFromURL(url string) map[string]interface{}`
 - `NewAttachmentFromBase64(base64Data, mimeType string) map[string]interface{}`
 - `NewAttachmentFromFilePath(filePath string) (map[string]interface{}, error)`
 
 #### Webhook Handlers
+
 - `ParseWebhookPayload(jsonPayload []byte) (*WebhookPayload, error)`
 - `IsTaskCreated(payload *WebhookPayload) bool`
 - `IsTaskStopped(payload *WebhookPayload) bool`
@@ -502,6 +515,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 👤 Author
 
 **Igor Sazonov**
+
 - GitHub: [@tigusigalpa](https://github.com/tigusigalpa)
 - Email: sovletig@gmail.com
 
