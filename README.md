@@ -1,8 +1,9 @@
 # Manus AI Go SDK
 
-![Manus AI Golang SDK](https://github.com/user-attachments/assets/7ab45f09-b62b-4983-a5ce-f120ecdf150a)
+![Manus AI Golang SDK](https://github.com/user-attachments/assets/1249e90c-a860-4f86-9a77-2d048f94854d)
 
-🚀 Complete Go library for integration with [Manus AI](https://manus.ai) API. Easily integrate Manus AI agent into your
+🚀 Complete Golang library for integration with [Manus AI](https://manus.ai) API. Easily integrate Manus AI agent into
+your
 Go applications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
