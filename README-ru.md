@@ -3,8 +3,9 @@
 ![Manus AI Golang SDK](https://github.com/user-attachments/assets/1249e90c-a860-4f86-9a77-2d048f94854d)
 
 🚀 Полная библиотека Golang для интеграции с API [Manus AI](https://manus.ai). Легко интегрируйте агента Manus AI в ваши
-Go
-приложения.
+Go приложения.
+
+**📦 Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.21-blue)](https://golang.org/)
