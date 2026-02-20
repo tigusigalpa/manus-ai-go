@@ -2,18 +2,17 @@
 
 ![Manus AI Golang SDK](https://github.com/user-attachments/assets/1249e90c-a860-4f86-9a77-2d048f94854d)
 
-🚀 Complete Golang library for integration with [Manus AI](https://manus.ai) API. Easily integrate Manus AI agent into
-your Go applications.
+Go client for the [Manus AI](https://manus.ai) API. Tasks, file uploads, webhooks.
 
-**📦 Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go)
+**Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.21-blue)](https://golang.org/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tigusigalpa/manus-ai-go)](https://goreportcard.com/report/github.com/tigusigalpa/manus-ai-go)
 
-**🌐 Language:** English | [Русский](README-ru.md)
+English | [Русский](README-ru.md)
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Features](#features)
 - [Requirements](#requirements)
@@ -30,31 +29,28 @@ your Go applications.
 - [Contributing](#contributing)
 - [License](#license)
 
-## ✨ Features
+## Features
 
-- ✅ Full support for Manus AI API
-- ✅ Task creation and management
-- ✅ File upload and attachment handling
-- ✅ Webhook integration for real-time updates
-- ✅ Comprehensive error handling with custom error types
-- ✅ Type-safe interfaces
-- ✅ Full test coverage
-- ✅ Detailed documentation and examples
-- ✅ Idiomatic Go code
+- Full Manus AI API support
+- Task creation and management
+- File upload and attachments
+- Webhook integration
+- Custom error types
+- Type-safe interfaces
+- Test coverage
+- Idiomatic Go
 
-## 📦 Requirements
+## Requirements
 
 - Go 1.21 or higher
 
-## 🔧 Installation
-
-Install the package using `go get`:
+## Installation
 
 ```bash
 go get github.com/tigusigalpa/manus-ai-go
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Getting Your API Key
 
@@ -87,7 +83,7 @@ client, err := manusai.NewClient(
 )
 ```
 
-## 🚀 Usage
+## Usage
 
 ### Basic Usage
 
@@ -122,9 +118,6 @@ func main() {
 ```
 
 ### Task Management
-
-Tasks are the core of Manus AI - they represent AI agent work items that can perform complex operations, answer
-questions, or automate workflows.
 
 **API Documentation:** [Tasks API Reference](https://open.manus.ai/docs/api-reference/create-task)
 
@@ -230,8 +223,7 @@ fmt.Printf("Deleted: %v\n", result.Deleted)
 
 ### File Management
 
-Manus AI supports file attachments to provide context for your tasks. The file upload process uses a two-step approach:
-first, create a file record to get a secure presigned URL, then upload your content directly to cloud storage.
+File uploads use a two-step process: create a file record to get a presigned URL, then upload content to that URL.
 
 **API Documentation:** [Files API Reference](https://open.manus.ai/docs/api-reference/create-file)
 
@@ -306,8 +298,7 @@ if err != nil {
 
 ### Webhooks
 
-Webhooks enable real-time notifications about your task lifecycle events. Instead of polling for updates, Manus AI will
-send HTTP POST requests to your specified endpoint whenever important events occur.
+Manus AI sends HTTP POST requests to your endpoint on task events instead of requiring polling.
 
 **API Documentation:** [Webhooks Guide](https://open.manus.ai/docs/webhooks/index)
 
@@ -381,7 +372,7 @@ if err != nil {
 }
 ```
 
-## 📚 API Reference
+## API Reference
 
 ### Client Methods
 
@@ -456,7 +447,7 @@ if err != nil {
 }
 ```
 
-## 💡 Examples
+## Examples
 
 See the `examples/` directory for complete working examples:
 
@@ -472,9 +463,7 @@ cd examples/basic
 go run main.go
 ```
 
-## 🧪 Testing
-
-Run the test suite:
+## Testing
 
 ```bash
 go test -v ./...
@@ -493,9 +482,7 @@ go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -503,29 +490,22 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE).
 
-## 🔗 Links
+## Links
 
-- [Manus AI Official Website](https://manus.ai)
+- [Manus AI](https://manus.ai)
 - [API Documentation](https://open.manus.ai/docs)
 - [GitHub Repository](https://github.com/tigusigalpa/manus-ai-go)
-- [Issue Tracker](https://github.com/tigusigalpa/manus-ai-go/issues)
+- [Issues](https://github.com/tigusigalpa/manus-ai-go/issues)
 
-## 👤 Author
+## Author
 
 **Igor Sazonov**
 
 - GitHub: [@tigusigalpa](https://github.com/tigusigalpa)
 - Email: sovletig@gmail.com
 
-## 🙏 Acknowledgments
-
-- Thanks to the Manus AI team for providing an excellent AI agent platform
-- Inspired by the PHP SDK: [manus-ai-php](https://github.com/tigusigalpa/manus-ai-php)
-
----
-
-Made with ❤️ by [Igor Sazonov](https://github.com/tigusigalpa)
+Also see the PHP SDK: [manus-ai-php](https://github.com/tigusigalpa/manus-ai-php)
