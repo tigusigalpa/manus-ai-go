@@ -10,22 +10,22 @@ import (
 
 func NewAttachmentFromFileID(fileID string) map[string]interface{} {
 	return map[string]interface{}{
-		"type":    "file_id",
+		"type":    "file",
 		"file_id": fileID,
 	}
 }
 
 func NewAttachmentFromURL(url string) map[string]interface{} {
 	return map[string]interface{}{
-		"type": "url",
-		"url":  url,
+		"type":     "file",
+		"file_url": url,
 	}
 }
 
 func NewAttachmentFromBase64(base64Data, mimeType string) map[string]interface{} {
 	return map[string]interface{}{
-		"type":      "data",
-		"data":      base64Data,
+		"type":      "file",
+		"file_data": base64Data,
 		"mime_type": mimeType,
 	}
 }

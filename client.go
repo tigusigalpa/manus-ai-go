@@ -68,34 +68,63 @@ func (c *Client) CreateTask(prompt string, options *TaskOptions) (*TaskResponse,
 		return nil, &ValidationError{Message: "Task prompt cannot be empty"}
 	}
 
+	message := map[string]interface{}{
+		"content": []map[string]interface{}{
+			{
+				"type": "text",
+				"text": prompt,
+			},
+		},
+	}
+
 	payload := map[string]interface{}{
-		"prompt":       prompt,
-		"agentProfile": "manus-1.6",
+		"message": message,
 	}
 
 	if options != nil {
 		if options.AgentProfile != "" {
-			payload["agentProfile"] = options.AgentProfile
-		}
-		if options.TaskMode != "" {
-			payload["taskMode"] = options.TaskMode
+			payload["agent_profile"] = options.AgentProfile
 		}
 		if options.Locale != "" {
 			payload["locale"] = options.Locale
 		}
 		if options.HideInTaskList != nil {
-			payload["hideInTaskList"] = *options.HideInTaskList
+			payload["hide_in_task_list"] = *options.HideInTaskList
 		}
-		if options.CreateShareableLink != nil {
-			payload["createShareableLink"] = *options.CreateShareableLink
+		if options.ShareVisibility != "" {
+			payload["share_visibility"] = options.ShareVisibility
+		}
+		if options.Title != "" {
+			payload["title"] = options.Title
+		}
+		if options.ProjectID != "" {
+			payload["project_id"] = options.ProjectID
+		}
+		if options.EnableAskUser != nil {
+			payload["enable_ask_user"] = *options.EnableAskUser
+		}
+		if options.Connectors != nil && len(options.Connectors) > 0 {
+			message["connectors"] = options.Connectors
+		}
+		if options.EnableSkills != nil && len(options.EnableSkills) > 0 {
+			message["enable_skills"] = options.EnableSkills
+		}
+		if options.ForceSkills != nil && len(options.ForceSkills) > 0 {
+			message["force_skills"] = options.ForceSkills
 		}
 		if options.Attachments != nil && len(options.Attachments) > 0 {
-			payload["attachments"] = options.Attachments
+			for _, att := range options.Attachments {
+				if attMap, ok := att.(map[string]interface{}); ok {
+					content := message["content"].([]map[string]interface{})
+					content = append(content, attMap)
+					message["content"] = content
+				}
+			}
 		}
 	}
 
 	var result TaskResponse
-	err := c.request("POST", "/v1/tasks", payload, nil, &result)
+	err := c.request("POST", "/v2/task.create", payload, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +136,8 @@ func (c *Client) GetTasks(filters *TaskFilters) (*TaskListResponse, error) {
 	query := url.Values{}
 
 	if filters != nil {
-		if filters.After != "" {
-			query.Set("after", filters.After)
+		if filters.Cursor != "" {
+			query.Set("cursor", filters.Cursor)
 		}
 		if filters.Limit > 0 {
 			query.Set("limit", fmt.Sprintf("%d", filters.Limit))
@@ -116,27 +145,19 @@ func (c *Client) GetTasks(filters *TaskFilters) (*TaskListResponse, error) {
 		if filters.Order != "" {
 			query.Set("order", filters.Order)
 		}
-		if filters.OrderBy != "" {
-			query.Set("orderBy", filters.OrderBy)
+		if filters.Scope != "" {
+			query.Set("scope", filters.Scope)
 		}
-		if filters.Query != "" {
-			query.Set("query", filters.Query)
+		if filters.AgentID != "" {
+			query.Set("agent_id", filters.AgentID)
 		}
-		if filters.Status != nil && len(filters.Status) > 0 {
-			for _, status := range filters.Status {
-				query.Add("status", status)
-			}
-		}
-		if filters.CreatedAfter != "" {
-			query.Set("createdAfter", filters.CreatedAfter)
-		}
-		if filters.CreatedBefore != "" {
-			query.Set("createdBefore", filters.CreatedBefore)
+		if filters.ProjectID != "" {
+			query.Set("project_id", filters.ProjectID)
 		}
 	}
 
 	var result TaskListResponse
-	err := c.request("GET", "/v1/tasks", nil, query, &result)
+	err := c.request("GET", "/v2/task.list", nil, query, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +170,11 @@ func (c *Client) GetTask(taskID string) (*TaskDetail, error) {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
 	}
 
+	query := url.Values{}
+	query.Set("task_id", taskID)
+
 	var result TaskDetail
-	err := c.request("GET", fmt.Sprintf("/v1/tasks/%s", taskID), nil, nil, &result)
+	err := c.request("GET", "/v2/task.detail", nil, query, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -167,19 +191,21 @@ func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, er
 		return nil, &ValidationError{Message: "Updates cannot be nil"}
 	}
 
-	payload := make(map[string]interface{})
+	payload := map[string]interface{}{
+		"task_id": taskID,
+	}
 	hasUpdates := false
 
 	if updates.Title != nil {
 		payload["title"] = *updates.Title
 		hasUpdates = true
 	}
-	if updates.EnableShared != nil {
-		payload["enableShared"] = *updates.EnableShared
+	if updates.ShareVisibility != nil {
+		payload["share_visibility"] = *updates.ShareVisibility
 		hasUpdates = true
 	}
-	if updates.EnableVisibleInTaskList != nil {
-		payload["enableVisibleInTaskList"] = *updates.EnableVisibleInTaskList
+	if updates.HideInTaskList != nil {
+		payload["hide_in_task_list"] = *updates.HideInTaskList
 		hasUpdates = true
 	}
 
@@ -188,7 +214,7 @@ func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, er
 	}
 
 	var result TaskDetail
-	err := c.request("PATCH", fmt.Sprintf("/v1/tasks/%s", taskID), payload, nil, &result)
+	err := c.request("POST", "/v2/task.update", payload, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -201,8 +227,12 @@ func (c *Client) DeleteTask(taskID string) (*DeleteResponse, error) {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
 	}
 
+	payload := map[string]interface{}{
+		"task_id": taskID,
+	}
+
 	var result DeleteResponse
-	err := c.request("DELETE", fmt.Sprintf("/v1/tasks/%s", taskID), nil, nil, &result)
+	err := c.request("POST", "/v2/task.delete", payload, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +250,7 @@ func (c *Client) CreateFile(filename string) (*FileResponse, error) {
 	}
 
 	var result FileResponse
-	err := c.request("POST", "/v1/files", payload, nil, &result)
+	err := c.request("POST", "/v2/file.upload", payload, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -261,9 +291,17 @@ func (c *Client) UploadFileContent(uploadURL string, fileContent []byte, content
 	return nil
 }
 
-func (c *Client) ListFiles() (*FileListResponse, error) {
+func (c *Client) ListFiles(limit int, cursor string) (*FileListResponse, error) {
+	query := url.Values{}
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	if cursor != "" {
+		query.Set("cursor", cursor)
+	}
+
 	var result FileListResponse
-	err := c.request("GET", "/v1/files", nil, nil, &result)
+	err := c.request("GET", "/v2/file.list", nil, query, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -276,8 +314,11 @@ func (c *Client) GetFile(fileID string) (*FileDetail, error) {
 		return nil, &ValidationError{Message: "File ID cannot be empty"}
 	}
 
+	query := url.Values{}
+	query.Set("file_id", fileID)
+
 	var result FileDetail
-	err := c.request("GET", fmt.Sprintf("/v1/files/%s", fileID), nil, nil, &result)
+	err := c.request("GET", "/v2/file.detail", nil, query, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -290,8 +331,12 @@ func (c *Client) DeleteFile(fileID string) (*DeleteResponse, error) {
 		return nil, &ValidationError{Message: "File ID cannot be empty"}
 	}
 
+	payload := map[string]interface{}{
+		"file_id": fileID,
+	}
+
 	var result DeleteResponse
-	err := c.request("DELETE", fmt.Sprintf("/v1/files/%s", fileID), nil, nil, &result)
+	err := c.request("POST", "/v2/file.delete", payload, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -309,11 +354,12 @@ func (c *Client) CreateWebhook(webhook *WebhookConfig) (*WebhookResponse, error)
 	}
 
 	payload := map[string]interface{}{
-		"webhook": webhook,
+		"url":    webhook.URL,
+		"events": webhook.Events,
 	}
 
 	var result WebhookResponse
-	err := c.request("POST", "/v1/webhooks", payload, nil, &result)
+	err := c.request("POST", "/v2/webhook.create", payload, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -326,8 +372,122 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 		return &ValidationError{Message: "Webhook ID cannot be empty"}
 	}
 
-	err := c.request("DELETE", fmt.Sprintf("/v1/webhooks/%s", webhookID), nil, nil, nil)
+	payload := map[string]interface{}{
+		"webhook_id": webhookID,
+	}
+
+	err := c.request("POST", "/v2/webhook.delete", payload, nil, nil)
 	return err
+}
+
+func (c *Client) ListMessages(taskID string, limit int, cursor string, order string, verbose bool) (*TaskMessagesResponse, error) {
+	if strings.TrimSpace(taskID) == "" {
+		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+	}
+
+	query := url.Values{}
+	query.Set("task_id", taskID)
+	
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	if cursor != "" {
+		query.Set("cursor", cursor)
+	}
+	if order != "" {
+		query.Set("order", order)
+	}
+	if verbose {
+		query.Set("verbose", "true")
+	}
+
+	var result TaskMessagesResponse
+	err := c.request("GET", "/v2/task.listMessages", nil, query, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func (c *Client) SendMessage(taskID string, message string, attachments []interface{}) (*SendMessageResponse, error) {
+	if strings.TrimSpace(taskID) == "" {
+		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+	}
+	if strings.TrimSpace(message) == "" {
+		return nil, &ValidationError{Message: "Message cannot be empty"}
+	}
+
+	content := []map[string]interface{}{
+		{
+			"type": "text",
+			"text": message,
+		},
+	}
+
+	if attachments != nil && len(attachments) > 0 {
+		for _, att := range attachments {
+			if attMap, ok := att.(map[string]interface{}); ok {
+				content = append(content, attMap)
+			}
+		}
+	}
+
+	payload := map[string]interface{}{
+		"task_id": taskID,
+		"message": map[string]interface{}{
+			"content": content,
+		},
+	}
+
+	var result SendMessageResponse
+	err := c.request("POST", "/v2/task.sendMessage", payload, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func (c *Client) StopTask(taskID string) (*StopTaskResponse, error) {
+	if strings.TrimSpace(taskID) == "" {
+		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+	}
+
+	payload := map[string]interface{}{
+		"task_id": taskID,
+	}
+
+	var result StopTaskResponse
+	err := c.request("POST", "/v2/task.stop", payload, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func (c *Client) ConfirmAction(taskID string, eventID string, input map[string]interface{}) (*ConfirmActionResponse, error) {
+	if strings.TrimSpace(taskID) == "" {
+		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+	}
+	if strings.TrimSpace(eventID) == "" {
+		return nil, &ValidationError{Message: "Event ID cannot be empty"}
+	}
+
+	payload := map[string]interface{}{
+		"task_id":  taskID,
+		"event_id": eventID,
+		"input":    input,
+	}
+
+	var result ConfirmActionResponse
+	err := c.request("POST", "/v2/task.confirmAction", payload, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
 
 func (c *Client) request(method, endpoint string, body interface{}, query url.Values, result interface{}) error {
@@ -350,7 +510,7 @@ func (c *Client) request(method, endpoint string, body interface{}, query url.Va
 		return &ManusAIError{Message: fmt.Sprintf("Failed to create request: %v", err)}
 	}
 
-	req.Header.Set("Authorization", c.apiKey)
+	req.Header.Set("x-manus-api-key", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 

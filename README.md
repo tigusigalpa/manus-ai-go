@@ -2,7 +2,7 @@
 
 ![Manus AI Golang SDK](https://github.com/user-attachments/assets/1249e90c-a860-4f86-9a77-2d048f94854d)
 
-Go client for the [Manus AI](https://manus.ai) API. Tasks, file uploads, webhooks.
+Go client for the [Manus AI](https://manus.ai) API v2. Tasks, file uploads, webhooks, and more.
 
 **Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go)
 
@@ -11,6 +11,8 @@ Go client for the [Manus AI](https://manus.ai) API. Tasks, file uploads, webhook
 [![Go Report Card](https://goreportcard.com/badge/github.com/tigusigalpa/manus-ai-go)](https://goreportcard.com/report/github.com/tigusigalpa/manus-ai-go)
 
 English | [Русский](README-ru.md)
+
+> **⚠️ Breaking Changes:** Version 2.0+ uses Manus API v2 with significant changes. See [Migration Guide](#migration-from-v1) below.
 
 ## Table of Contents
 
@@ -31,14 +33,29 @@ English | [Русский](README-ru.md)
 
 ## Features
 
-- Full Manus AI API support
-- Task creation and management
-- File upload and attachments
+- **Full Manus AI API v2 support**
+- Task creation and management with new message-based format
+- Multi-turn conversations with `SendMessage`
+- Task lifecycle management (`ListMessages`, `StopTask`, `ConfirmAction`)
+- File upload and attachments (file_id, file_url, file_data)
 - Webhook integration
-- Custom error types
+- Projects and skills support
+- Connectors integration
+- Custom error types with detailed responses
 - Type-safe interfaces
 - Test coverage
 - Idiomatic Go
+
+### New in v2
+
+- **Message-based API**: Tasks now use structured content with message format
+- **Task polling**: Use `ListMessages` to track task progress and events
+- **Interactive tasks**: Confirm actions with `ConfirmAction` when agent needs approval
+- **Multi-turn conversations**: Continue conversations with `SendMessage`
+- **Enhanced metadata**: Tasks include `agent_status`, `share_visibility`, timestamps
+- **Cursor-based pagination**: Efficient pagination for tasks and files
+- **Skills & Connectors**: Enable specific skills and connectors per task
+- **Projects**: Group related tasks under projects
 
 ## Requirements
 
@@ -119,21 +136,36 @@ func main() {
 
 ### Task Management
 
-**API Documentation:** [Tasks API Reference](https://open.manus.ai/docs/api-reference/create-task)
+**API Documentation:** [Tasks API v2 Reference](https://open.manus.im/docs/v2/task.create)
 
 #### Create a Task
 
 ```go
 task, err := client.CreateTask("Your task prompt here", &manusai.TaskOptions{
-    AgentProfile:        manusai.AgentProfileManus16,
-    TaskMode:            "agent",  // "chat", "adaptive", or "agent"
-    Locale:              "en-US",
-    HideInTaskList:      &falseVal,
-    CreateShareableLink: &trueVal,
+    AgentProfile:    manusai.AgentProfileManus16,
+    Locale:          "en-US",
+    HideInTaskList:  &falseVal,
+    ShareVisibility: "private", // "private", "team", or "public"
+    Title:           "My Custom Task",
+    ProjectID:       "proj_123",
+    EnableAskUser:   &trueVal,
 })
 if err != nil {
     log.Fatal(err)
 }
+
+fmt.Printf("Task ID: %s\n", task.TaskID)
+fmt.Printf("Task URL: %s\n", task.TaskURL)
+```
+
+#### Create Task with Skills and Connectors
+
+```go
+task, err := client.CreateTask("Search for recent AI news", &manusai.TaskOptions{
+    AgentProfile: manusai.AgentProfileManus16,
+    Connectors:   []string{"conn_google", "conn_twitter"},
+    EnableSkills: []string{"skill_web_search", "skill_summarize"},
+})
 ```
 
 **Available Agent Profiles:**
@@ -167,12 +199,72 @@ if err != nil {
     log.Fatal(err)
 }
 
-fmt.Printf("Status: %s\n", task.Status)
+fmt.Printf("Agent Status: %s\n", task.AgentStatus)
 fmt.Printf("Credits used: %.2f\n", task.CreditUsage)
+fmt.Printf("Share Visibility: %s\n", task.ShareVisibility)
+```
 
-// Access output messages
-for _, message := range task.Output {
-    fmt.Printf("[%s]: %s\n", message.Role, message.Content)
+#### List Task Messages (Poll for Progress)
+
+```go
+messages, err := client.ListMessages("task_id", 50, "", "desc", false)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, msg := range messages.Messages {
+    switch msg.Type {
+    case "user_message":
+        fmt.Printf("User: %v\n", msg.UserMessage["content"])
+    case "assistant_message":
+        fmt.Printf("Assistant: %v\n", msg.AssistantMessage["content"])
+    case "status_update":
+        status := msg.StatusUpdate["agent_status"]
+        fmt.Printf("Status: %v\n", status)
+        
+        // Check if waiting for confirmation
+        if status == "waiting" {
+            if detail, ok := msg.StatusUpdate["status_detail"].(map[string]interface{}); ok {
+                eventID := detail["waiting_for_event_id"].(string)
+                eventType := detail["waiting_for_event_type"].(string)
+                fmt.Printf("Waiting for: %s (event: %s)\n", eventType, eventID)
+            }
+        }
+    case "error_message":
+        fmt.Printf("Error: %v\n", msg.ErrorMessage["content"])
+    }
+}
+```
+
+#### Send Follow-up Message
+
+```go
+response, err := client.SendMessage("task_id", "Please provide more details", nil)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+#### Stop a Running Task
+
+```go
+response, err := client.StopTask("task_id")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+#### Confirm Action (Interactive Tasks)
+
+```go
+// When task is waiting for confirmation
+input := map[string]interface{}{
+    "accept": true,
+}
+
+response, err := client.ConfirmAction("task_id", "evt_abc123", input)
+if err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -180,17 +272,26 @@ for _, message := range task.Output {
 
 ```go
 tasks, err := client.GetTasks(&manusai.TaskFilters{
-    Limit:   10,
-    Order:   "desc",
-    OrderBy: "created_at",
-    Status:  []string{"completed", "running"},
+    Limit:     10,
+    Order:     "desc",
+    Scope:     "all", // "all", "agent_subtask", etc.
+    ProjectID: "proj_123",
 })
 if err != nil {
     log.Fatal(err)
 }
 
-for _, task := range tasks.Data {
-    fmt.Printf("Task %s: %s\n", task.ID, task.Status)
+for _, task := range tasks.Tasks {
+    fmt.Printf("Task %s: %s (Status: %s)\n", task.ID, task.Title, task.AgentStatus)
+}
+
+// Pagination
+if tasks.HasMore {
+    nextPage, _ := client.GetTasks(&manusai.TaskFilters{
+        Cursor: tasks.NextCursor,
+        Limit:  10,
+    })
+    // Process next page...
 }
 ```
 
@@ -198,12 +299,13 @@ for _, task := range tasks.Data {
 
 ```go
 newTitle := "New Task Title"
-enableShared := true
+shareVisibility := "team"
+hideInTaskList := false
 
 updated, err := client.UpdateTask("task_id", &manusai.TaskUpdate{
-    Title:                   &newTitle,
-    EnableShared:            &enableShared,
-    EnableVisibleInTaskList: &enableShared,
+    Title:           &newTitle,
+    ShareVisibility: &shareVisibility,
+    HideInTaskList:  &hideInTaskList,
 })
 if err != nil {
     log.Fatal(err)
@@ -494,10 +596,79 @@ go tool cover -html=coverage.out
 
 MIT License — see [LICENSE](LICENSE).
 
+## Migration from v1
+
+### Breaking Changes
+
+1. **API Endpoints**: All endpoints changed from `/v1/` to `/v2/` with new naming (e.g., `/v2/task.create`)
+
+2. **Authentication Header**: Changed from `Authorization` to `x-manus-api-key`
+
+3. **Request Structure**: Tasks now use message-based format:
+   ```go
+   // v1
+   payload := map[string]interface{}{
+       "prompt": "Hello",
+       "agentProfile": "manus-1.6",
+   }
+   
+   // v2
+   payload := map[string]interface{}{
+       "message": map[string]interface{}{
+           "content": []map[string]interface{}{
+               {"type": "text", "text": "Hello"},
+           },
+       },
+       "agent_profile": "manus-1.6",
+   }
+   ```
+
+4. **Response Format**: All responses now include `ok` and `request_id` fields
+
+5. **Field Names**: Snake_case instead of camelCase:
+   - `agentProfile` → `agent_profile`
+   - `hideInTaskList` → `hide_in_task_list`
+   - `createShareableLink` → `share_visibility`
+
+6. **Task Status**: `Status` → `AgentStatus`
+
+7. **Timestamps**: Changed from string to int64 (Unix milliseconds)
+
+8. **Attachments**: New structure with `file_id`, `file_url`, `file_data`
+
+9. **Removed Fields**:
+   - `TaskMode` (no longer needed)
+   - `CreateShareableLink` (replaced by `ShareVisibility`)
+
+10. **New Methods**:
+    - `ListMessages()` - Poll task progress
+    - `SendMessage()` - Continue conversations
+    - `StopTask()` - Stop running tasks
+    - `ConfirmAction()` - Confirm pending actions
+
+### Migration Example
+
+```go
+// v1
+task, err := client.CreateTask("Hello", &manusai.TaskOptions{
+    AgentProfile: "manus-1.6",
+    TaskMode:     "agent",
+})
+
+// v2
+task, err := client.CreateTask("Hello", &manusai.TaskOptions{
+    AgentProfile:    manusai.AgentProfileManus16,
+    ShareVisibility: "private",
+})
+
+// v2: Poll for progress
+messages, _ := client.ListMessages(task.TaskID, 50, "", "desc", false)
+```
+
 ## Links
 
 - [Manus AI](https://manus.ai)
-- [API Documentation](https://open.manus.ai/docs)
+- [API v2 Documentation](https://open.manus.im/docs/v2/introduction)
 - [GitHub Repository](https://github.com/tigusigalpa/manus-ai-go)
 - [Issues](https://github.com/tigusigalpa/manus-ai-go/issues)
 
