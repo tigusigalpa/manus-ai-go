@@ -1,6 +1,6 @@
 # Manus AI Go SDK
 
-![Manus AI Golang SDK](https://github.com/user-attachments/assets/1249e90c-a860-4f86-9a77-2d048f94854d)
+![Manus AI Golang SDK](https://i.postimg.cc/6pm3pLcK/manus-ai-api-go-sdk.png)
 
 Go client for the [Manus AI](https://manus.ai) API v2. Tasks, file uploads, webhooks, and more.
 
@@ -12,7 +12,8 @@ Go client for the [Manus AI](https://manus.ai) API v2. Tasks, file uploads, webh
 
 English | [Русский](README-ru.md)
 
-> **⚠️ Breaking Changes:** Version 2.0+ uses Manus API v2 with significant changes. See [Migration Guide](#migration-from-v1) below.
+> **⚠️ Breaking Changes:** Version 2.0+ uses Manus API v2 with significant changes.
+> See [Migration Guide](#migration-from-v1) below.
 
 ## Table of Contents
 
@@ -626,9 +627,9 @@ MIT License — see [LICENSE](LICENSE).
 4. **Response Format**: All responses now include `ok` and `request_id` fields
 
 5. **Field Names**: Snake_case instead of camelCase:
-   - `agentProfile` → `agent_profile`
-   - `hideInTaskList` → `hide_in_task_list`
-   - `createShareableLink` → `share_visibility`
+    - `agentProfile` → `agent_profile`
+    - `hideInTaskList` → `hide_in_task_list`
+    - `createShareableLink` → `share_visibility`
 
 6. **Task Status**: `Status` → `AgentStatus`
 
@@ -637,8 +638,8 @@ MIT License — see [LICENSE](LICENSE).
 8. **Attachments**: New structure with `file_id`, `file_url`, `file_data`
 
 9. **Removed Fields**:
-   - `TaskMode` (no longer needed)
-   - `CreateShareableLink` (replaced by `ShareVisibility`)
+    - `TaskMode` (no longer needed)
+    - `CreateShareableLink` (replaced by `ShareVisibility`)
 
 10. **New Methods**:
     - `ListMessages()` - Poll task progress

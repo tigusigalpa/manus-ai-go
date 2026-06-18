@@ -1,6 +1,6 @@
 # Manus AI Go SDK
 
-![Manus AI Golang SDK](https://github.com/user-attachments/assets/1249e90c-a860-4f86-9a77-2d048f94854d)
+![Manus AI Golang SDK](https://i.postimg.cc/6pm3pLcK/manus-ai-api-go-sdk.png)
 
 Go-клиент для API v2 [Manus AI](https://manus.ai). Задачи, мультитёрн диалоги, загрузка файлов, вебхуки.
 
@@ -11,7 +11,8 @@ Go-клиент для API v2 [Manus AI](https://manus.ai). Задачи, мул
 
 Русский | [English](README.md)
 
-> **⚠️ Критические изменения:** Версия 2.0+ использует Manus API v2 со значительными изменениями. См. [Руководство по миграции](#миграция-с-v1) ниже.
+> **⚠️ Критические изменения:** Версия 2.0+ использует Manus API v2 со значительными изменениями.
+> См. [Руководство по миграции](#миграция-с-v1) ниже.
 
 ## Содержание
 
@@ -177,9 +178,9 @@ MIT License — см. [LICENSE](LICENSE).
 4. **Формат ответов**: Все ответы теперь включают поля `ok` и `request_id`
 
 5. **Названия полей**: Snake_case вместо camelCase:
-   - `agentProfile` → `agent_profile`
-   - `hideInTaskList` → `hide_in_task_list`
-   - `createShareableLink` → `share_visibility`
+    - `agentProfile` → `agent_profile`
+    - `hideInTaskList` → `hide_in_task_list`
+    - `createShareableLink` → `share_visibility`
 
 6. **Статус задачи**: `Status` → `AgentStatus`
 
@@ -188,8 +189,8 @@ MIT License — см. [LICENSE](LICENSE).
 8. **Вложения**: Новая структура с `file_id`, `file_url`, `file_data`
 
 9. **Удалённые поля**:
-   - `TaskMode` (больше не нужен)
-   - `CreateShareableLink` (заменён на `ShareVisibility`)
+    - `TaskMode` (больше не нужен)
+    - `CreateShareableLink` (заменён на `ShareVisibility`)
 
 10. **Новые методы**:
     - `ListMessages()` - Отслеживание прогресса задачи
