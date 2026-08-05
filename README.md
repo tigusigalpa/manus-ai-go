@@ -4,7 +4,7 @@
 
 Go client for the [Manus AI](https://manus.ai) API v2. Tasks, file uploads, webhooks, and more.
 
-**Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go)
+**Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.21-blue)](https://golang.org/)
@@ -65,7 +65,7 @@ English | [Русский](README-ru.md)
 ## Installation
 
 ```bash
-go get github.com/tigusigalpa/manus-ai-go
+go get github.com/tigusigalpa/manus-ai-go/v2
 ```
 
 ## Configuration
@@ -78,7 +78,7 @@ go get github.com/tigusigalpa/manus-ai-go
 ### Basic Configuration
 
 ```go
-import manusai "github.com/tigusigalpa/manus-ai-go"
+import manusai "github.com/tigusigalpa/manus-ai-go/v2"
 
 client, err := manusai.NewClient("your-api-key-here")
 if err != nil {
@@ -91,7 +91,7 @@ if err != nil {
 ```go
 import (
     "time"
-    manusai "github.com/tigusigalpa/manus-ai-go"
+    manusai "github.com/tigusigalpa/manus-ai-go/v2"
 )
 
 client, err := manusai.NewClient(
@@ -112,7 +112,7 @@ import (
     "fmt"
     "log"
     
-    manusai "github.com/tigusigalpa/manus-ai-go"
+    manusai "github.com/tigusigalpa/manus-ai-go/v2"
 )
 
 func main() {

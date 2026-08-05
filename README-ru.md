@@ -4,7 +4,7 @@
 
 Go-клиент для API v2 [Manus AI](https://manus.ai). Задачи, мультитёрн диалоги, загрузка файлов, вебхуки.
 
-**Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go)
+**Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.21-blue)](https://golang.org/)
@@ -58,7 +58,7 @@ Go-клиент для API v2 [Manus AI](https://manus.ai). Задачи, мул
 ## Установка
 
 ```bash
-go get github.com/tigusigalpa/manus-ai-go
+go get github.com/tigusigalpa/manus-ai-go/v2
 ```
 
 ## Конфигурация
@@ -71,7 +71,7 @@ go get github.com/tigusigalpa/manus-ai-go
 ### Базовая конфигурация
 
 ```go
-import manusai "github.com/tigusigalpa/manus-ai-go"
+import manusai "github.com/tigusigalpa/manus-ai-go/v2"
 
 client, err := manusai.NewClient("ваш-api-ключ")
 if err != nil {
