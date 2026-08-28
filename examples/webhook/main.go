@@ -21,110 +21,83 @@ func main() {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
-	fmt.Println("=== Creating Webhook ===")
-	webhook := &manusai.WebhookConfig{
+	webhook, err := client.CreateWebhook(&manusai.WebhookConfig{
 		URL:    "https://your-domain.com/webhook/manus-ai",
 		Events: []string{"task_created", "task_stopped"},
-	}
-
-	webhookResult, err := client.CreateWebhook(webhook)
+	})
 	if err != nil {
 		log.Fatalf("Failed to create webhook: %v", err)
 	}
 
-	fmt.Printf("Webhook created successfully!\n")
-	fmt.Printf("Webhook ID: %s\n", webhookResult.WebhookID)
-
-	fmt.Println("\n=== Starting Webhook Server ===")
-	fmt.Println("Server will listen on http://localhost:8080/webhook")
-	fmt.Println("Press Ctrl+C to stop")
-
+	fmt.Printf("Webhook created: %s\n", webhook.WebhookID)
 	http.HandleFunc("/webhook", handleWebhook)
-
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatalf("Server failed: %v", err)
-	}
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Printf("Error reading request body: %v", err)
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	defer func() { _ = r.Body.Close() }()
 
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "could not read request", http.StatusBadRequest)
+		return
+	}
 	payload, err := manusai.ParseWebhookPayload(body)
 	if err != nil {
-		log.Printf("Error parsing webhook payload: %v", err)
-		http.Error(w, "Invalid payload", http.StatusBadRequest)
+		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
 
-	fmt.Printf("\n=== Webhook Event Received ===\n")
-	fmt.Printf("Event Type: %s\n", payload.EventType)
-
-	if manusai.IsTaskCreated(payload) {
-		fmt.Println("Event: Task Created")
-		taskDetail := manusai.GetTaskDetail(payload)
-		if taskDetail != nil {
-			fmt.Printf("Task Details: %+v\n", taskDetail)
-		}
-	}
-
-	if manusai.IsTaskStopped(payload) {
-		fmt.Println("Event: Task Stopped")
-
-		if manusai.IsTaskCompleted(payload) {
-			fmt.Println("Task completed successfully!")
-			taskDetail := manusai.GetTaskDetail(payload)
-			if taskDetail != nil {
-				if taskID, ok := taskDetail["task_id"].(string); ok {
-					fmt.Printf("Task ID: %s\n", taskID)
-				}
-				if message, ok := taskDetail["message"].(string); ok {
-					fmt.Printf("Message: %s\n", message)
-				}
-			}
-
-			attachments := manusai.GetAttachments(payload)
-			if len(attachments) > 0 {
-				fmt.Printf("Attachments (%d):\n", len(attachments))
-				for i, att := range attachments {
-					if attMap, ok := att.(map[string]interface{}); ok {
-						fmt.Printf("  %d. ", i+1)
-						if fileName, ok := attMap["file_name"].(string); ok {
-							fmt.Printf("File: %s ", fileName)
-						}
-						if size, ok := attMap["size_bytes"].(float64); ok {
-							fmt.Printf("(%d bytes) ", int64(size))
-						}
-						if url, ok := attMap["url"].(string); ok {
-							fmt.Printf("URL: %s", url)
-						}
-						fmt.Println()
-					}
-				}
-			}
-		}
-
-		if manusai.IsTaskAskingForInput(payload) {
-			fmt.Println("Task is asking for user input!")
-			taskDetail := manusai.GetTaskDetail(payload)
-			if taskDetail != nil {
-				if message, ok := taskDetail["message"].(string); ok {
-					fmt.Printf("Input required: %s\n", message)
-				}
-			}
-		}
-	}
-
+	logWebhookEvent(payload)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
+}
+
+func logWebhookEvent(payload *manusai.WebhookPayload) {
+	if manusai.IsTaskCreated(payload) {
+		fmt.Printf("Task created: %+v\n", manusai.GetTaskDetail(payload))
+		return
+	}
+	if !manusai.IsTaskStopped(payload) {
+		return
+	}
+
+	fmt.Println("Task stopped")
+	if manusai.IsTaskCompleted(payload) {
+		logCompletedTask(payload)
+	}
+	if manusai.IsTaskAskingForInput(payload) {
+		logInputRequest(payload)
+	}
+}
+
+func logCompletedTask(payload *manusai.WebhookPayload) {
+	detail := manusai.GetTaskDetail(payload)
+	if taskID, ok := detail["task_id"].(string); ok {
+		fmt.Printf("Task completed: %s\n", taskID)
+	}
+	if message, ok := detail["message"].(string); ok {
+		fmt.Printf("Message: %s\n", message)
+	}
+	logAttachments(manusai.GetAttachments(payload))
+}
+
+func logAttachments(attachments []interface{}) {
+	for _, attachment := range attachments {
+		attachmentMap, ok := attachment.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		fmt.Printf("Attachment: %v\n", attachmentMap)
+	}
+}
+
+func logInputRequest(payload *manusai.WebhookPayload) {
+	if message, ok := manusai.GetTaskDetail(payload)["message"].(string); ok {
+		fmt.Printf("Input required: %s\n", message)
+	}
 }

@@ -1,6 +1,7 @@
 # Manus AI Go SDK
 
 [![Tests](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/test.yml)
+[![CodeQL](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/codeql.yml)
 [![Codecov](https://codecov.io/gh/tigusigalpa/manus-ai-go/branch/main/graph/badge.svg)](https://codecov.io/gh/tigusigalpa/manus-ai-go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/tigusigalpa/manus-ai-go/v2.svg)](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/tigusigalpa/manus-ai-go?logo=go)](go.mod)

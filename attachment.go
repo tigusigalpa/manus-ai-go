@@ -11,25 +11,25 @@ import (
 // NewAttachmentFromFileID creates a file attachment that refers to an uploaded Manus file.
 func NewAttachmentFromFileID(fileID string) map[string]interface{} {
 	return map[string]interface{}{
-		"type":    "file",
-		"file_id": fileID,
+		attachmentTypeKey: attachmentTypeFile,
+		fileIDField:       fileID,
 	}
 }
 
 // NewAttachmentFromURL creates a file attachment that refers to a publicly accessible URL.
 func NewAttachmentFromURL(url string) map[string]interface{} {
 	return map[string]interface{}{
-		"type":     "file",
-		"file_url": url,
+		attachmentTypeKey: attachmentTypeFile,
+		"file_url":        url,
 	}
 }
 
 // NewAttachmentFromBase64 creates a file attachment from base64-encoded data and its MIME type.
 func NewAttachmentFromBase64(base64Data, mimeType string) map[string]interface{} {
 	return map[string]interface{}{
-		"type":      "file",
-		"file_data": base64Data,
-		"mime_type": mimeType,
+		attachmentTypeKey: attachmentTypeFile,
+		"file_data":       base64Data,
+		"mime_type":       mimeType,
 	}
 }
 

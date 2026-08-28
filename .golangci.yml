@@ -18,6 +18,7 @@ linters:
     dupl:
       threshold: 100
     goconst:
+      ignore-tests: true
       min-len: 2
       min-occurrences: 2
     gocyclo:

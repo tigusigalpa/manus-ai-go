@@ -5,6 +5,14 @@ import (
 	"fmt"
 )
 
+const (
+	taskCreatedEvent = "task_created"
+	taskStoppedEvent = "task_stopped"
+	stopReasonField  = "stop_reason"
+	stopReasonFinish = "finish"
+	stopReasonAsk    = "ask"
+)
+
 // ParseWebhookPayload decodes and validates a Manus webhook request body.
 func ParseWebhookPayload(jsonPayload []byte) (*WebhookPayload, error) {
 	var payload WebhookPayload
@@ -21,12 +29,12 @@ func ParseWebhookPayload(jsonPayload []byte) (*WebhookPayload, error) {
 
 // IsTaskCreated reports whether payload represents a task_created event.
 func IsTaskCreated(payload *WebhookPayload) bool {
-	return payload != nil && payload.EventType == "task_created"
+	return payload != nil && payload.EventType == taskCreatedEvent
 }
 
 // IsTaskStopped reports whether payload represents a task_stopped event.
 func IsTaskStopped(payload *WebhookPayload) bool {
-	return payload != nil && payload.EventType == "task_stopped"
+	return payload != nil && payload.EventType == taskStoppedEvent
 }
 
 // IsTaskCompleted reports whether a stopped task finished successfully.
@@ -39,8 +47,8 @@ func IsTaskCompleted(payload *WebhookPayload) bool {
 		return false
 	}
 
-	stopReason, ok := payload.TaskDetail["stop_reason"].(string)
-	return ok && stopReason == "finish"
+	stopReason, ok := payload.TaskDetail[stopReasonField].(string)
+	return ok && stopReason == stopReasonFinish
 }
 
 // IsTaskAskingForInput reports whether a stopped task is waiting for user input.
@@ -53,8 +61,8 @@ func IsTaskAskingForInput(payload *WebhookPayload) bool {
 		return false
 	}
 
-	stopReason, ok := payload.TaskDetail["stop_reason"].(string)
-	return ok && stopReason == "ask"
+	stopReason, ok := payload.TaskDetail[stopReasonField].(string)
+	return ok && stopReason == stopReasonAsk
 }
 
 // GetTaskDetail returns the event task detail, or nil when payload is nil.

@@ -18,6 +18,17 @@ const (
 	DefaultConnectTimeout = 10 * time.Second
 	defaultContentType    = "application/octet-stream"
 	maxResponseBodySize   = 4 << 20 // 4 MiB
+	attachmentTypeKey     = "type"
+	attachmentTypeFile    = "file"
+	fileIDField           = "file_id"
+	messageContentKey     = "content"
+	messageKey            = "message"
+	messageTextKey        = "text"
+	messageTypeText       = "text"
+	taskIDField           = "task_id"
+	emptyTaskIDMessage    = "Task ID cannot be empty"
+	emptyFileIDMessage    = "File ID cannot be empty"
+	attachmentsError      = "Attachments must be created with an attachment helper or be map[string]interface{}"
 )
 
 // Client is a Manus API v2 client.
@@ -111,16 +122,16 @@ func (c *Client) CreateTask(prompt string, options *TaskOptions) (*TaskResponse,
 
 func newTaskPayload(prompt string, options *TaskOptions) (map[string]interface{}, error) {
 	message := map[string]interface{}{
-		"content": []map[string]interface{}{
+		messageContentKey: []map[string]interface{}{
 			{
-				"type": "text",
-				"text": prompt,
+				attachmentTypeKey: messageTypeText,
+				messageTextKey:    prompt,
 			},
 		},
 	}
 
 	payload := map[string]interface{}{
-		"message": message,
+		messageKey: message,
 	}
 
 	if options == nil {
@@ -166,11 +177,11 @@ func applyTaskOptions(payload, message map[string]interface{}, options *TaskOpti
 		message["force_skills"] = options.ForceSkills
 	}
 
-	attachments, err := appendAttachments(message["content"].([]map[string]interface{}), options.Attachments)
+	attachments, err := appendAttachments(message[messageContentKey].([]map[string]interface{}), options.Attachments)
 	if err != nil {
 		return err
 	}
-	message["content"] = attachments
+	message[messageContentKey] = attachments
 
 	return nil
 }
@@ -179,7 +190,7 @@ func appendAttachments(content []map[string]interface{}, attachments []interface
 	for _, attachment := range attachments {
 		attachmentMap, ok := attachment.(map[string]interface{})
 		if !ok {
-			return nil, &ValidationError{Message: "Attachments must be created with an attachment helper or be map[string]interface{}"}
+			return nil, &ValidationError{Message: attachmentsError}
 		}
 		content = append(content, attachmentMap)
 	}
@@ -224,11 +235,11 @@ func (c *Client) GetTasks(filters *TaskFilters) (*TaskListResponse, error) {
 // GetTask returns task details for taskID.
 func (c *Client) GetTask(taskID string) (*TaskDetail, error) {
 	if strings.TrimSpace(taskID) == "" {
-		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyTaskIDMessage}
 	}
 
 	query := url.Values{}
-	query.Set("task_id", taskID)
+	query.Set(taskIDField, taskID)
 
 	var result TaskDetail
 	err := c.request("GET", "/v2/task.detail", nil, query, &result)
@@ -242,7 +253,7 @@ func (c *Client) GetTask(taskID string) (*TaskDetail, error) {
 // UpdateTask updates the supported fields of taskID.
 func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, error) {
 	if strings.TrimSpace(taskID) == "" {
-		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyTaskIDMessage}
 	}
 
 	if updates == nil {
@@ -250,7 +261,7 @@ func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, er
 	}
 
 	payload := map[string]interface{}{
-		"task_id": taskID,
+		taskIDField: taskID,
 	}
 	hasUpdates := false
 
@@ -283,11 +294,11 @@ func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, er
 // DeleteTask deletes taskID and returns the API deletion result.
 func (c *Client) DeleteTask(taskID string) (*DeleteResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
-		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyTaskIDMessage}
 	}
 
 	payload := map[string]interface{}{
-		"task_id": taskID,
+		taskIDField: taskID,
 	}
 
 	var result DeleteResponse
@@ -374,11 +385,11 @@ func (c *Client) ListFiles(limit int, cursor string) (*FileListResponse, error) 
 // GetFile returns metadata for fileID.
 func (c *Client) GetFile(fileID string) (*FileDetail, error) {
 	if strings.TrimSpace(fileID) == "" {
-		return nil, &ValidationError{Message: "File ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyFileIDMessage}
 	}
 
 	query := url.Values{}
-	query.Set("file_id", fileID)
+	query.Set(fileIDField, fileID)
 
 	var result FileDetail
 	err := c.request("GET", "/v2/file.detail", nil, query, &result)
@@ -392,11 +403,11 @@ func (c *Client) GetFile(fileID string) (*FileDetail, error) {
 // DeleteFile deletes fileID and returns the API deletion result.
 func (c *Client) DeleteFile(fileID string) (*DeleteResponse, error) {
 	if strings.TrimSpace(fileID) == "" {
-		return nil, &ValidationError{Message: "File ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyFileIDMessage}
 	}
 
 	payload := map[string]interface{}{
-		"file_id": fileID,
+		fileIDField: fileID,
 	}
 
 	var result DeleteResponse
@@ -449,11 +460,11 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 // ListMessages returns messages for taskID using optional cursor pagination.
 func (c *Client) ListMessages(taskID string, limit int, cursor string, order string, verbose bool) (*TaskMessagesResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
-		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyTaskIDMessage}
 	}
 
 	query := url.Values{}
-	query.Set("task_id", taskID)
+	query.Set(taskIDField, taskID)
 
 	if limit > 0 {
 		query.Set("limit", fmt.Sprintf("%d", limit))
@@ -480,7 +491,7 @@ func (c *Client) ListMessages(taskID string, limit int, cursor string, order str
 // SendMessage sends message and optional attachments to an existing task.
 func (c *Client) SendMessage(taskID string, message string, attachments []interface{}) (*SendMessageResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
-		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyTaskIDMessage}
 	}
 	if strings.TrimSpace(message) == "" {
 		return nil, &ValidationError{Message: "Message cannot be empty"}
@@ -488,8 +499,8 @@ func (c *Client) SendMessage(taskID string, message string, attachments []interf
 
 	content := []map[string]interface{}{
 		{
-			"type": "text",
-			"text": message,
+			attachmentTypeKey: messageTypeText,
+			messageTextKey:    message,
 		},
 	}
 
@@ -497,16 +508,16 @@ func (c *Client) SendMessage(taskID string, message string, attachments []interf
 		for _, att := range attachments {
 			attMap, ok := att.(map[string]interface{})
 			if !ok {
-				return nil, &ValidationError{Message: "Attachments must be created with an attachment helper or be map[string]interface{}"}
+				return nil, &ValidationError{Message: attachmentsError}
 			}
 			content = append(content, attMap)
 		}
 	}
 
 	payload := map[string]interface{}{
-		"task_id": taskID,
-		"message": map[string]interface{}{
-			"content": content,
+		taskIDField: taskID,
+		messageKey: map[string]interface{}{
+			messageContentKey: content,
 		},
 	}
 
@@ -522,11 +533,11 @@ func (c *Client) SendMessage(taskID string, message string, attachments []interf
 // StopTask requests that Manus stop the running task identified by taskID.
 func (c *Client) StopTask(taskID string) (*StopTaskResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
-		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyTaskIDMessage}
 	}
 
 	payload := map[string]interface{}{
-		"task_id": taskID,
+		taskIDField: taskID,
 	}
 
 	var result StopTaskResponse
@@ -541,16 +552,16 @@ func (c *Client) StopTask(taskID string) (*StopTaskResponse, error) {
 // ConfirmAction submits input for a pending task action event.
 func (c *Client) ConfirmAction(taskID string, eventID string, input map[string]interface{}) (*ConfirmActionResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
-		return nil, &ValidationError{Message: "Task ID cannot be empty"}
+		return nil, &ValidationError{Message: emptyTaskIDMessage}
 	}
 	if strings.TrimSpace(eventID) == "" {
 		return nil, &ValidationError{Message: "Event ID cannot be empty"}
 	}
 
 	payload := map[string]interface{}{
-		"task_id":  taskID,
-		"event_id": eventID,
-		"input":    input,
+		taskIDField: taskID,
+		"event_id":  eventID,
+		"input":     input,
 	}
 
 	var result ConfirmActionResponse
