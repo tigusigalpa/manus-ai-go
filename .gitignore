@@ -14,6 +14,7 @@ coverage.html
 coverage.txt
 
 # Local Go build and test caches
+.cache/
 .gocache/
 .gotmp/
 coverage/

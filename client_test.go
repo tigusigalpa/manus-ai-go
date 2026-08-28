@@ -1,7 +1,9 @@
 package manusai
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,18 @@ import (
 )
 
 const testAPIKey = "test-api-key"
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) {
+	return 0, errors.New("read failure")
+}
 
 func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 	t.Helper()
@@ -138,6 +152,73 @@ func TestCreateTaskValidatesInput(t *testing.T) {
 	}
 }
 
+func TestTaskPayloadOptions(t *testing.T) {
+	hideInTaskList := true
+	enableAskUser := false
+	payload, err := newTaskPayload("Build a report", &TaskOptions{
+		AgentProfile:    AgentProfileQuality,
+		Locale:          "ru-RU",
+		HideInTaskList:  &hideInTaskList,
+		ShareVisibility: "private",
+		Title:           "Report",
+		ProjectID:       "project_123",
+		EnableAskUser:   &enableAskUser,
+		Connectors:      []string{"github"},
+		EnableSkills:    []string{"research"},
+		ForceSkills:     []string{"browser"},
+		Attachments:     []interface{}{NewAttachmentFromURL("https://example.com/report.pdf")},
+	})
+	if err != nil {
+		t.Fatalf("newTaskPayload() error = %v", err)
+	}
+	if payload["locale"] != "ru-RU" || payload["hide_in_task_list"] != true || payload["enable_ask_user"] != false {
+		t.Fatalf("unexpected task options payload: %#v", payload)
+	}
+	message := payload[messageKey].(map[string]interface{})
+	if len(message[messageContentKey].([]map[string]interface{})) != 2 || len(message["connectors"].([]string)) != 1 {
+		t.Fatalf("unexpected task message: %#v", message)
+	}
+}
+
+func TestClientRejectsInvalidInput(t *testing.T) {
+	client, err := NewClient(testAPIKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{"empty task ID", func() error { _, err := client.GetTask(" "); return err }},
+		{"nil task update", func() error { _, err := client.UpdateTask("task_123", nil); return err }},
+		{"empty task update", func() error { _, err := client.UpdateTask("task_123", &TaskUpdate{}); return err }},
+		{"empty task to update", func() error { _, err := client.UpdateTask("", &TaskUpdate{}); return err }},
+		{"empty task to delete", func() error { _, err := client.DeleteTask(""); return err }},
+		{"empty filename", func() error { _, err := client.CreateFile(""); return err }},
+		{"empty upload URL", func() error { return client.UploadFileContent("", nil, "") }},
+		{"empty file ID", func() error { _, err := client.GetFile(""); return err }},
+		{"empty file to delete", func() error { _, err := client.DeleteFile(""); return err }},
+		{"nil webhook", func() error { _, err := client.CreateWebhook(nil); return err }},
+		{"empty webhook URL", func() error { _, err := client.CreateWebhook(&WebhookConfig{}); return err }},
+		{"empty webhook ID", func() error { return client.DeleteWebhook("") }},
+		{"empty messages task", func() error { _, err := client.ListMessages("", 0, "", "", false); return err }},
+		{"empty message task", func() error { _, err := client.SendMessage("", "message", nil); return err }},
+		{"empty message", func() error { _, err := client.SendMessage("task_123", "", nil); return err }},
+		{"empty stopped task", func() error { _, err := client.StopTask(""); return err }},
+		{"empty confirmed task", func() error { _, err := client.ConfirmAction("", "event_123", nil); return err }},
+		{"empty event ID", func() error { _, err := client.ConfirmAction("task_123", "", nil); return err }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.call(); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
 func TestTaskAndFileRequests(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -197,7 +278,8 @@ func TestTaskAndFileRequests(t *testing.T) {
 
 func TestUploadFileContentAndErrors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPut || r.Header.Get("Content-Type") != "text/plain" {
+		contentType := r.Header.Get("Content-Type")
+		if r.Method != http.MethodPut || (contentType != "text/plain" && contentType != defaultContentType) {
 			t.Fatalf("unexpected upload request: %s, %s", r.Method, r.Header.Get("Content-Type"))
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -206,6 +288,17 @@ func TestUploadFileContentAndErrors(t *testing.T) {
 	client, _ := NewClient(testAPIKey)
 	if err := client.UploadFileContent(server.URL, []byte("content"), "text/plain"); err != nil {
 		t.Fatalf("UploadFileContent() error = %v", err)
+	}
+	if err := client.UploadFileContent(server.URL, []byte("content"), ""); err != nil {
+		t.Fatalf("UploadFileContent() with default type error = %v", err)
+	}
+
+	failingUpload := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = io.WriteString(w, "upstream failure")
+	})
+	if err := failingUpload.UploadFileContent(failingUpload.baseURL, nil, "text/plain"); err == nil || !strings.Contains(err.Error(), "502") {
+		t.Fatalf("UploadFileContent() error = %v, want HTTP status error", err)
 	}
 
 	for status, wantType := range map[int]string{http.StatusUnauthorized: "authentication", http.StatusBadRequest: "validation", http.StatusInternalServerError: "manus-ai"} {
@@ -219,5 +312,47 @@ func TestUploadFileContentAndErrors(t *testing.T) {
 				t.Fatalf("error = %v, want %s error", err, wantType)
 			}
 		})
+	}
+}
+
+func TestRequestAndResponseFailurePaths(t *testing.T) {
+	transportErrorClient, err := NewClient(testAPIKey, WithHTTPClient(&http.Client{
+		Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("network unavailable")
+		}),
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := transportErrorClient.GetTask("task_123"); err == nil {
+		t.Fatal("GetTask() did not return a transport error")
+	}
+	if err := transportErrorClient.UploadFileContent("https://example.com/upload", nil, "text/plain"); err == nil {
+		t.Fatal("UploadFileContent() did not return a transport error")
+	}
+
+	if err := transportErrorClient.request(http.MethodPost, "/v2/task.create", make(chan int), nil, nil); err == nil {
+		t.Fatal("request() accepted an unsupported JSON value")
+	}
+
+	invalidURLClient, _ := NewClient(testAPIKey)
+	invalidURLClient.baseURL = "://invalid"
+	if err := invalidURLClient.request(http.MethodGet, "/v2/task.detail", nil, nil, nil); err == nil {
+		t.Fatal("request() accepted an invalid URL")
+	}
+
+	malformedResponseClient := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "not-json")
+	})
+	if _, err := malformedResponseClient.GetTask("task_123"); err == nil {
+		t.Fatal("GetTask() accepted malformed JSON")
+	}
+
+	if _, err := readResponseBody(failingReader{}); err == nil {
+		t.Fatal("readResponseBody() did not report a reader error")
+	}
+	tooLarge := bytes.Repeat([]byte("x"), maxResponseBodySize+1)
+	if _, err := readResponseBody(bytes.NewReader(tooLarge)); err == nil {
+		t.Fatal("readResponseBody() accepted an oversized body")
 	}
 }
