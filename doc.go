@@ -6,11 +6,11 @@ upload files, and receive real-time notifications via webhooks.
 
 # Installation
 
-	go get github.com/tigusigalpa/manus-ai-go
+	go get github.com/tigusigalpa/manus-ai-go/v2
 
 # Quick Start
 
-	import manusai "github.com/tigusigalpa/manus-ai-go"
+	import manusai "github.com/tigusigalpa/manus-ai-go/v2"
 
 	// Create a client
 	client, err := manusai.NewClient("your-api-key")
@@ -21,7 +21,6 @@ upload files, and receive real-time notifications via webhooks.
 	// Create a task
 	task, err := client.CreateTask("Write a poem about Go", &manusai.TaskOptions{
 		AgentProfile: manusai.AgentProfileManus16,
-		TaskMode:     "chat",
 	})
 	if err != nil {
 		log.Fatal(err)

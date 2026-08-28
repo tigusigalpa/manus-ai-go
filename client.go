@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	DefaultBaseURL       = "https://api.manus.ai"
-	DefaultTimeout       = 30 * time.Second
+	DefaultBaseURL        = "https://api.manus.ai"
+	DefaultTimeout        = 30 * time.Second
 	DefaultConnectTimeout = 10 * time.Second
+	maxResponseBodySize   = 4 << 20 // 4 MiB
 )
 
 type Client struct {
@@ -39,6 +40,9 @@ func WithHTTPClient(httpClient *http.Client) ClientOption {
 
 func WithTimeout(timeout time.Duration) ClientOption {
 	return func(c *Client) {
+		if c.httpClient == nil {
+			c.httpClient = &http.Client{}
+		}
 		c.httpClient.Timeout = timeout
 	}
 }
@@ -57,7 +61,22 @@ func NewClient(apiKey string, opts ...ClientOption) (*Client, error) {
 	}
 
 	for _, opt := range opts {
+		if opt == nil {
+			return nil, &ValidationError{Message: "Client option cannot be nil"}
+		}
 		opt(client)
+	}
+
+	if client.httpClient == nil {
+		return nil, &ValidationError{Message: "HTTP client cannot be nil"}
+	}
+
+	baseURL, err := url.ParseRequestURI(client.baseURL)
+	if err != nil || baseURL.Scheme == "" || baseURL.Host == "" {
+		return nil, &ValidationError{Message: "Base URL must be an absolute HTTP URL"}
+	}
+	if baseURL.Scheme != "http" && baseURL.Scheme != "https" {
+		return nil, &ValidationError{Message: "Base URL must use HTTP or HTTPS"}
 	}
 
 	return client, nil
@@ -112,13 +131,15 @@ func (c *Client) CreateTask(prompt string, options *TaskOptions) (*TaskResponse,
 		if options.ForceSkills != nil && len(options.ForceSkills) > 0 {
 			message["force_skills"] = options.ForceSkills
 		}
-		if options.Attachments != nil && len(options.Attachments) > 0 {
+		if len(options.Attachments) > 0 {
 			for _, att := range options.Attachments {
-				if attMap, ok := att.(map[string]interface{}); ok {
-					content := message["content"].([]map[string]interface{})
-					content = append(content, attMap)
-					message["content"] = content
+				attMap, ok := att.(map[string]interface{})
+				if !ok {
+					return nil, &ValidationError{Message: "Attachments must be created with an attachment helper or be map[string]interface{}"}
 				}
+				content := message["content"].([]map[string]interface{})
+				content = append(content, attMap)
+				message["content"] = content
 			}
 		}
 	}
@@ -280,8 +301,8 @@ func (c *Client) UploadFileContent(uploadURL string, fileContent []byte, content
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		body, _ := readResponseBody(resp.Body)
 		return &ManusAIError{
 			Message:    fmt.Sprintf("Upload failed with status %d: %s", resp.StatusCode, string(body)),
 			StatusCode: resp.StatusCode,
@@ -349,7 +370,7 @@ func (c *Client) CreateWebhook(webhook *WebhookConfig) (*WebhookResponse, error)
 		return nil, &ValidationError{Message: "Webhook configuration cannot be nil"}
 	}
 
-	if webhook.URL == "" {
+	if strings.TrimSpace(webhook.URL) == "" {
 		return nil, &ValidationError{Message: "Webhook URL is required"}
 	}
 
@@ -387,7 +408,7 @@ func (c *Client) ListMessages(taskID string, limit int, cursor string, order str
 
 	query := url.Values{}
 	query.Set("task_id", taskID)
-	
+
 	if limit > 0 {
 		query.Set("limit", fmt.Sprintf("%d", limit))
 	}
@@ -425,11 +446,13 @@ func (c *Client) SendMessage(taskID string, message string, attachments []interf
 		},
 	}
 
-	if attachments != nil && len(attachments) > 0 {
+	if len(attachments) > 0 {
 		for _, att := range attachments {
-			if attMap, ok := att.(map[string]interface{}); ok {
-				content = append(content, attMap)
+			attMap, ok := att.(map[string]interface{})
+			if !ok {
+				return nil, &ValidationError{Message: "Attachments must be created with an attachment helper or be map[string]interface{}"}
 			}
+			content = append(content, attMap)
 		}
 	}
 
@@ -524,7 +547,7 @@ func (c *Client) request(method, endpoint string, body interface{}, query url.Va
 		return nil
 	}
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readResponseBody(resp.Body)
 	if err != nil {
 		return &ManusAIError{Message: fmt.Sprintf("Failed to read response body: %v", err)}
 	}
@@ -544,6 +567,18 @@ func (c *Client) request(method, endpoint string, body interface{}, query url.Va
 	}
 
 	return nil
+}
+
+func readResponseBody(body io.Reader) ([]byte, error) {
+	response, err := io.ReadAll(io.LimitReader(body, maxResponseBodySize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(response) > maxResponseBodySize {
+		return nil, fmt.Errorf("response body exceeds %d bytes", maxResponseBodySize)
+	}
+
+	return response, nil
 }
 
 func (c *Client) handleErrorResponse(statusCode int, body []byte) error {

@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	manusai "github.com/tigusigalpa/manus-ai-go"
+	manusai "github.com/tigusigalpa/manus-ai-go/v2"
 )
 
 func main() {
@@ -22,7 +22,6 @@ func main() {
 	fmt.Println("=== Creating a Task ===")
 	task, err := client.CreateTask("Write a poem about Go programming", &manusai.TaskOptions{
 		AgentProfile: manusai.AgentProfileManus16,
-		TaskMode:     "chat",
 	})
 	if err != nil {
 		log.Fatalf("Failed to create task: %v", err)
@@ -39,7 +38,7 @@ func main() {
 		log.Fatalf("Failed to get task: %v", err)
 	}
 
-	fmt.Printf("Status: %s\n", taskDetail.Status)
+	fmt.Printf("Status: %s\n", taskDetail.AgentStatus)
 	fmt.Printf("Credit Usage: %.2f\n", taskDetail.CreditUsage)
 
 	fmt.Println("\n=== Listing Tasks ===")
@@ -51,9 +50,9 @@ func main() {
 		log.Fatalf("Failed to list tasks: %v", err)
 	}
 
-	fmt.Printf("Found %d tasks\n", len(tasks.Data))
-	for i, t := range tasks.Data {
-		fmt.Printf("%d. %s - %s (Status: %s)\n", i+1, t.ID, t.Title, t.Status)
+	fmt.Printf("Found %d tasks\n", len(tasks.Tasks))
+	for i, t := range tasks.Tasks {
+		fmt.Printf("%d. %s - %s (Status: %s)\n", i+1, t.ID, t.Title, t.AgentStatus)
 	}
 
 	fmt.Println("\n=== Updating Task ===")

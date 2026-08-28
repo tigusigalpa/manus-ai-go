@@ -19,11 +19,11 @@ func ParseWebhookPayload(jsonPayload []byte) (*WebhookPayload, error) {
 }
 
 func IsTaskCreated(payload *WebhookPayload) bool {
-	return payload.EventType == "task_created"
+	return payload != nil && payload.EventType == "task_created"
 }
 
 func IsTaskStopped(payload *WebhookPayload) bool {
-	return payload.EventType == "task_stopped"
+	return payload != nil && payload.EventType == "task_stopped"
 }
 
 func IsTaskCompleted(payload *WebhookPayload) bool {
@@ -53,11 +53,14 @@ func IsTaskAskingForInput(payload *WebhookPayload) bool {
 }
 
 func GetTaskDetail(payload *WebhookPayload) map[string]interface{} {
+	if payload == nil {
+		return nil
+	}
 	return payload.TaskDetail
 }
 
 func GetAttachments(payload *WebhookPayload) []interface{} {
-	if payload.TaskDetail == nil {
+	if payload == nil || payload.TaskDetail == nil {
 		return nil
 	}
 

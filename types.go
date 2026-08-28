@@ -1,17 +1,17 @@
 package manusai
 
 type TaskOptions struct {
-	AgentProfile     string        `json:"agent_profile,omitempty"`
-	Locale           string        `json:"locale,omitempty"`
-	HideInTaskList   *bool         `json:"hide_in_task_list,omitempty"`
-	ShareVisibility  string        `json:"share_visibility,omitempty"`
-	Title            string        `json:"title,omitempty"`
-	ProjectID        string        `json:"project_id,omitempty"`
-	EnableAskUser    *bool         `json:"enable_ask_user,omitempty"`
-	Connectors       []string      `json:"connectors,omitempty"`
-	EnableSkills     []string      `json:"enable_skills,omitempty"`
-	ForceSkills      []string      `json:"force_skills,omitempty"`
-	Attachments      []interface{} `json:"attachments,omitempty"`
+	AgentProfile    string        `json:"agent_profile,omitempty"`
+	Locale          string        `json:"locale,omitempty"`
+	HideInTaskList  *bool         `json:"hide_in_task_list,omitempty"`
+	ShareVisibility string        `json:"share_visibility,omitempty"`
+	Title           string        `json:"title,omitempty"`
+	ProjectID       string        `json:"project_id,omitempty"`
+	EnableAskUser   *bool         `json:"enable_ask_user,omitempty"`
+	Connectors      []string      `json:"connectors,omitempty"`
+	EnableSkills    []string      `json:"enable_skills,omitempty"`
+	ForceSkills     []string      `json:"force_skills,omitempty"`
+	Attachments     []interface{} `json:"attachments,omitempty"`
 }
 
 type TaskResponse struct {

@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	manusai "github.com/tigusigalpa/manus-ai-go"
+	manusai "github.com/tigusigalpa/manus-ai-go/v2"
 )
 
 func main() {
@@ -25,9 +25,8 @@ func main() {
 		log.Fatalf("Failed to create file: %v", err)
 	}
 
-	fmt.Printf("File ID: %s\n", fileResult.ID)
+	fmt.Printf("File ID: %s\n", fileResult.FileID)
 	fmt.Printf("Filename: %s\n", fileResult.Filename)
-	fmt.Printf("Status: %s\n", fileResult.Status)
 
 	fmt.Println("\n=== Uploading File Content ===")
 	fileContent := []byte("This is sample PDF content")
@@ -39,8 +38,8 @@ func main() {
 	fmt.Println("File uploaded successfully!")
 
 	fmt.Println("\n=== Creating Task with File Attachment ===")
-	attachment := manusai.NewAttachmentFromFileID(fileResult.ID)
-	
+	attachment := manusai.NewAttachmentFromFileID(fileResult.FileID)
+
 	task, err := client.CreateTask("Analyze this document", &manusai.TaskOptions{
 		AgentProfile: manusai.AgentProfileManus16,
 		Attachments:  []interface{}{attachment},
@@ -55,7 +54,7 @@ func main() {
 
 	fmt.Println("\n=== Creating Task with URL Attachment ===")
 	urlAttachment := manusai.NewAttachmentFromURL("https://example.com/image.jpg")
-	
+
 	task2, err := client.CreateTask("Describe this image", &manusai.TaskOptions{
 		AgentProfile: manusai.AgentProfileManus16,
 		Attachments:  []interface{}{urlAttachment},
@@ -84,18 +83,18 @@ func main() {
 	}
 
 	fmt.Println("\n=== Listing Files ===")
-	files, err := client.ListFiles()
+	files, err := client.ListFiles(20, "")
 	if err != nil {
 		log.Fatalf("Failed to list files: %v", err)
 	}
 
-	fmt.Printf("Found %d files\n", len(files.Data))
-	for i, f := range files.Data {
-		fmt.Printf("%d. %s - %s (Status: %s)\n", i+1, f.ID, f.Filename, f.Status)
+	fmt.Printf("Found %d files\n", len(files.Files))
+	for i, f := range files.Files {
+		fmt.Printf("%d. %s - %s (Status: %s)\n", i+1, f.FileID, f.Filename, f.Status)
 	}
 
 	fmt.Println("\n=== Deleting File ===")
-	deleteResult, err := client.DeleteFile(fileResult.ID)
+	deleteResult, err := client.DeleteFile(fileResult.FileID)
 	if err != nil {
 		log.Fatalf("Failed to delete file: %v", err)
 	}

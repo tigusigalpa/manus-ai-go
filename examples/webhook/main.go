@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	manusai "github.com/tigusigalpa/manus-ai-go"
+	manusai "github.com/tigusigalpa/manus-ai-go/v2"
 )
 
 func main() {
@@ -40,7 +40,7 @@ func main() {
 	fmt.Println("Press Ctrl+C to stop")
 
 	http.HandleFunc("/webhook", handleWebhook)
-	
+
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
@@ -80,7 +80,7 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if manusai.IsTaskStopped(payload) {
 		fmt.Println("Event: Task Stopped")
-		
+
 		if manusai.IsTaskCompleted(payload) {
 			fmt.Println("Task completed successfully!")
 			taskDetail := manusai.GetTaskDetail(payload)

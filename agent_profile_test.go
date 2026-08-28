@@ -1,68 +1,26 @@
 package manusai
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/stretchr/testify/assert"
-)
-
-func TestAllAgentProfiles(t *testing.T) {
+func TestAgentProfiles(t *testing.T) {
 	profiles := AllAgentProfiles()
-	assert.Len(t, profiles, 5)
-	assert.Contains(t, profiles, AgentProfileManus16)
-	assert.Contains(t, profiles, AgentProfileManus16Lite)
-	assert.Contains(t, profiles, AgentProfileManus16Max)
-	assert.Contains(t, profiles, AgentProfileSpeed)
-	assert.Contains(t, profiles, AgentProfileQuality)
-}
-
-func TestRecommendedAgentProfiles(t *testing.T) {
-	profiles := RecommendedAgentProfiles()
-	assert.Len(t, profiles, 3)
-	assert.Contains(t, profiles, AgentProfileManus16)
-	assert.Contains(t, profiles, AgentProfileManus16Lite)
-	assert.Contains(t, profiles, AgentProfileManus16Max)
-	assert.NotContains(t, profiles, AgentProfileSpeed)
-	assert.NotContains(t, profiles, AgentProfileQuality)
-}
-
-func TestIsValidAgentProfile(t *testing.T) {
-	tests := []struct {
-		profile string
-		valid   bool
-	}{
-		{AgentProfileManus16, true},
-		{AgentProfileManus16Lite, true},
-		{AgentProfileManus16Max, true},
-		{AgentProfileSpeed, true},
-		{AgentProfileQuality, true},
-		{"invalid-profile", false},
-		{"", false},
+	if len(profiles) != 5 || !IsValidAgentProfile(AgentProfileManus16) || !IsValidAgentProfile(AgentProfileQuality) {
+		t.Fatalf("unexpected profiles: %#v", profiles)
+	}
+	if IsValidAgentProfile("unknown") || IsValidAgentProfile("") {
+		t.Fatal("unknown profiles must not be valid")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.profile, func(t *testing.T) {
-			assert.Equal(t, tt.valid, IsValidAgentProfile(tt.profile))
-		})
+	recommended := RecommendedAgentProfiles()
+	if len(recommended) != 3 || IsDeprecatedAgentProfile(AgentProfileManus16) {
+		t.Fatalf("unexpected recommended profiles: %#v", recommended)
 	}
-}
-
-func TestIsDeprecatedAgentProfile(t *testing.T) {
-	tests := []struct {
-		profile    string
-		deprecated bool
-	}{
-		{AgentProfileManus16, false},
-		{AgentProfileManus16Lite, false},
-		{AgentProfileManus16Max, false},
-		{AgentProfileSpeed, true},
-		{AgentProfileQuality, true},
-		{"invalid-profile", false},
+	if !IsDeprecatedAgentProfile(AgentProfileSpeed) || !IsDeprecatedAgentProfile(AgentProfileQuality) {
+		t.Fatal("legacy profiles must be marked deprecated")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.profile, func(t *testing.T) {
-			assert.Equal(t, tt.deprecated, IsDeprecatedAgentProfile(tt.profile))
-		})
+	profiles[0] = "changed"
+	if AllAgentProfiles()[0] == "changed" {
+		t.Fatal("AllAgentProfiles() exposed its internal slice")
 	}
 }

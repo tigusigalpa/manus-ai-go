@@ -1,683 +1,312 @@
 # Manus AI Go SDK
 
-![Manus AI Golang SDK](https://i.postimg.cc/6pm3pLcK/manus-ai-api-go-sdk.png)
+A small, idiomatic Go client for the Manus API v2. It helps an application create and manage Manus tasks, continue a conversation, upload files, and process webhooks without hand-writing HTTP requests.
 
-Go client for the [Manus AI](https://manus.ai) API v2. Tasks, file uploads, webhooks, and more.
+[Русская версия](README-ru.md) · [Manus API documentation](https://open.manus.im/docs/v2/introduction) · [Package documentation](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2)
 
-**Package:** [pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2)
+> This is an independent community SDK. Manus API behaviour, available agent profiles, and accepted option values are controlled by Manus; check their documentation when upgrading an integration.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-%3E%3D1.21-blue)](https://golang.org/)
-[![Go Report Card](https://goreportcard.com/badge/github.com/tigusigalpa/manus-ai-go)](https://goreportcard.com/report/github.com/tigusigalpa/manus-ai-go)
+## What you can do
 
-English | [Русский](README-ru.md)
+- Create, inspect, update, stop, and delete tasks.
+- Read task messages and send a follow-up message to an existing task.
+- Create upload slots, upload bytes, attach files, list files, and delete files.
+- Register webhooks and turn an incoming JSON payload into a useful Go value.
+- Configure the base URL, HTTP client, or request timeout for tests and production environments.
 
-> **⚠️ Breaking Changes:** Version 2.0+ uses Manus API v2 with significant changes.
-> See [Migration Guide](#migration-from-v1) below.
+## Requirements and installation
 
-## Table of Contents
-
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-    - [Basic Usage](#basic-usage)
-    - [Task Management](#task-management)
-    - [File Management](#file-management)
-    - [Webhooks](#webhooks)
-- [API Reference](#api-reference)
-- [Examples](#examples)
-- [Testing](#testing)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Features
-
-- **Full Manus AI API v2 support**
-- Task creation and management with new message-based format
-- Multi-turn conversations with `SendMessage`
-- Task lifecycle management (`ListMessages`, `StopTask`, `ConfirmAction`)
-- File upload and attachments (file_id, file_url, file_data)
-- Webhook integration
-- Projects and skills support
-- Connectors integration
-- Custom error types with detailed responses
-- Type-safe interfaces
-- Test coverage
-- Idiomatic Go
-
-### New in v2
-
-- **Message-based API**: Tasks now use structured content with message format
-- **Task polling**: Use `ListMessages` to track task progress and events
-- **Interactive tasks**: Confirm actions with `ConfirmAction` when agent needs approval
-- **Multi-turn conversations**: Continue conversations with `SendMessage`
-- **Enhanced metadata**: Tasks include `agent_status`, `share_visibility`, timestamps
-- **Cursor-based pagination**: Efficient pagination for tasks and files
-- **Skills & Connectors**: Enable specific skills and connectors per task
-- **Projects**: Group related tasks under projects
-
-## Requirements
-
-- Go 1.21 or higher
-
-## Installation
+The module requires Go 1.21 or newer.
 
 ```bash
 go get github.com/tigusigalpa/manus-ai-go/v2
 ```
 
-## Configuration
+The `/v2` suffix is important: it selects the API-v2-compatible version of the SDK.
 
-### Getting Your API Key
+## Quick start
 
-1. Sign up at [Manus AI](https://manus.im)
-2. Get your API key from the [API Integration settings](http://manus.im/app?show_settings=integrations&app_name=api)
+Store the API key outside source code. For local work, an environment variable is a convenient choice:
 
-### Basic Configuration
-
-```go
-import manusai "github.com/tigusigalpa/manus-ai-go/v2"
-
-client, err := manusai.NewClient("your-api-key-here")
-if err != nil {
-    log.Fatal(err)
-}
+```bash
+export MANUS_AI_API_KEY="your-api-key"
 ```
-
-### Custom Configuration
-
-```go
-import (
-    "time"
-    manusai "github.com/tigusigalpa/manus-ai-go/v2"
-)
-
-client, err := manusai.NewClient(
-    "your-api-key",
-    manusai.WithBaseURL("https://custom.api.com"),
-    manusai.WithTimeout(60 * time.Second),
-)
-```
-
-## Usage
-
-### Basic Usage
 
 ```go
 package main
 
 import (
-    "fmt"
-    "log"
-    
-    manusai "github.com/tigusigalpa/manus-ai-go/v2"
+	"fmt"
+	"log"
+	"os"
+
+	manusai "github.com/tigusigalpa/manus-ai-go/v2"
 )
 
 func main() {
-    client, err := manusai.NewClient("your-api-key")
-    if err != nil {
-        log.Fatal(err)
-    }
+	client, err := manusai.NewClient(os.Getenv("MANUS_AI_API_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    // Create a task
-    task, err := client.CreateTask("Write a poem about Go programming", &manusai.TaskOptions{
-        AgentProfile: manusai.AgentProfileManus16,
-        TaskMode:     "chat",
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
+	task, err := client.CreateTask("Write a short release note for my Go project.", &manusai.TaskOptions{
+		AgentProfile: manusai.AgentProfileManus16,
+		Title:        "Release note",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    fmt.Printf("Task created: %s\n", task.TaskID)
-    fmt.Printf("View at: %s\n", task.TaskURL)
+	fmt.Printf("Created task %s: %s\n", task.TaskID, task.TaskURL)
 }
 ```
 
-### Task Management
+`NewClient` validates an empty API key, a nil HTTP client, and an invalid base URL before making any request. By default it sends requests to `https://api.manus.ai` and uses a 30-second overall request timeout.
 
-**API Documentation:** [Tasks API v2 Reference](https://open.manus.im/docs/v2/task.create)
+## Client configuration
 
-#### Create a Task
+Most programs only need `NewClient(key)`. Options are useful for a custom timeout, an instrumented client, or a local test server.
 
 ```go
-task, err := client.CreateTask("Your task prompt here", &manusai.TaskOptions{
-    AgentProfile:    manusai.AgentProfileManus16,
-    Locale:          "en-US",
-    HideInTaskList:  &falseVal,
-    ShareVisibility: "private", // "private", "team", or "public"
-    Title:           "My Custom Task",
-    ProjectID:       "proj_123",
-    EnableAskUser:   &trueVal,
+httpClient := &http.Client{Timeout: 45 * time.Second}
+client, err := manusai.NewClient(apiKey,
+	manusai.WithHTTPClient(httpClient),
+	manusai.WithBaseURL("https://api.manus.ai"),
+)
+```
+
+`WithTimeout` changes the timeout on the SDK's HTTP client. If you need a custom transport, retry policy, proxy, or tracing, create an `http.Client` yourself and pass it with `WithHTTPClient`.
+
+## Working with tasks
+
+### Create a task
+
+`TaskOptions` is optional. Use only the options that are relevant to the task; empty values are not sent.
+
+```go
+hideFromList := true
+task, err := client.CreateTask("Summarize this design decision.", &manusai.TaskOptions{
+	AgentProfile:     manusai.AgentProfileManus16,
+	Locale:           "en-US",
+	Title:            "Design summary",
+	ShareVisibility:  "private",
+	HideInTaskList:   &hideFromList,
+	ProjectID:        "project_123",
+	Connectors:       []string{"connector_123"},
+	EnableSkills:     []string{"skill_123"},
+	ForceSkills:      []string{"skill_456"},
 })
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
-
-fmt.Printf("Task ID: %s\n", task.TaskID)
-fmt.Printf("Task URL: %s\n", task.TaskURL)
 ```
 
-#### Create Task with Skills and Connectors
+The SDK ships profile constants and small discovery helpers:
 
 ```go
-task, err := client.CreateTask("Search for recent AI news", &manusai.TaskOptions{
-    AgentProfile: manusai.AgentProfileManus16,
-    Connectors:   []string{"conn_google", "conn_twitter"},
-    EnableSkills: []string{"skill_web_search", "skill_summarize"},
-})
-```
-
-**Available Agent Profiles:**
-
-- `AgentProfileManus16` - Latest and most capable model (recommended)
-- `AgentProfileManus16Lite` - Faster, lightweight version
-- `AgentProfileManus16Max` - Maximum capability version
-- `AgentProfileSpeed` - ⚠️ Deprecated, use `AgentProfileManus16Lite` instead
-- `AgentProfileQuality` - ⚠️ Deprecated, use `AgentProfileManus16` instead
-
-```go
-// Check if a profile is valid
-if manusai.IsValidAgentProfile("manus-1.6") {
-    fmt.Println("Valid profile")
-}
-
-// Check if deprecated
-if manusai.IsDeprecatedAgentProfile(manusai.AgentProfileSpeed) {
-    fmt.Println("This profile is deprecated")
-}
-
-// Get all recommended profiles
 profiles := manusai.RecommendedAgentProfiles()
+if manusai.IsDeprecatedAgentProfile(manusai.AgentProfileSpeed) {
+	// Choose a current profile instead.
+}
 ```
 
-#### Get Task Details
+### Inspect, list, and update tasks
 
 ```go
-task, err := client.GetTask("task_id")
+detail, err := client.GetTask(task.TaskID)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
+fmt.Println(detail.AgentStatus)
 
-fmt.Printf("Agent Status: %s\n", task.AgentStatus)
-fmt.Printf("Credits used: %.2f\n", task.CreditUsage)
-fmt.Printf("Share Visibility: %s\n", task.ShareVisibility)
-```
-
-#### List Task Messages (Poll for Progress)
-
-```go
-messages, err := client.ListMessages("task_id", 50, "", "desc", false)
-if err != nil {
-    log.Fatal(err)
-}
-
-for _, msg := range messages.Messages {
-    switch msg.Type {
-    case "user_message":
-        fmt.Printf("User: %v\n", msg.UserMessage["content"])
-    case "assistant_message":
-        fmt.Printf("Assistant: %v\n", msg.AssistantMessage["content"])
-    case "status_update":
-        status := msg.StatusUpdate["agent_status"]
-        fmt.Printf("Status: %v\n", status)
-        
-        // Check if waiting for confirmation
-        if status == "waiting" {
-            if detail, ok := msg.StatusUpdate["status_detail"].(map[string]interface{}); ok {
-                eventID := detail["waiting_for_event_id"].(string)
-                eventType := detail["waiting_for_event_type"].(string)
-                fmt.Printf("Waiting for: %s (event: %s)\n", eventType, eventID)
-            }
-        }
-    case "error_message":
-        fmt.Printf("Error: %v\n", msg.ErrorMessage["content"])
-    }
-}
-```
-
-#### Send Follow-up Message
-
-```go
-response, err := client.SendMessage("task_id", "Please provide more details", nil)
-if err != nil {
-    log.Fatal(err)
-}
-```
-
-#### Stop a Running Task
-
-```go
-response, err := client.StopTask("task_id")
-if err != nil {
-    log.Fatal(err)
-}
-```
-
-#### Confirm Action (Interactive Tasks)
-
-```go
-// When task is waiting for confirmation
-input := map[string]interface{}{
-    "accept": true,
-}
-
-response, err := client.ConfirmAction("task_id", "evt_abc123", input)
-if err != nil {
-    log.Fatal(err)
-}
-```
-
-#### List Tasks
-
-```go
 tasks, err := client.GetTasks(&manusai.TaskFilters{
-    Limit:     10,
-    Order:     "desc",
-    Scope:     "all", // "all", "agent_subtask", etc.
-    ProjectID: "proj_123",
+	Limit:     20,
+	Order:     "desc",
+	ProjectID: "project_123",
 })
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
+}
+for _, item := range tasks.Tasks {
+	fmt.Printf("%s — %s\n", item.ID, item.AgentStatus)
 }
 
-for _, task := range tasks.Tasks {
-    fmt.Printf("Task %s: %s (Status: %s)\n", task.ID, task.Title, task.AgentStatus)
-}
-
-// Pagination
-if tasks.HasMore {
-    nextPage, _ := client.GetTasks(&manusai.TaskFilters{
-        Cursor: tasks.NextCursor,
-        Limit:  10,
-    })
-    // Process next page...
-}
+title := "Revised title"
+_, err = client.UpdateTask(task.TaskID, &manusai.TaskUpdate{Title: &title})
 ```
 
-#### Update Task
+List responses use cursor pagination. Pass `NextCursor` back as `TaskFilters.Cursor` when `HasMore` is true.
+
+### Follow progress or continue a task
+
+Use `ListMessages` to poll a task, `SendMessage` to continue the conversation, and `StopTask` to request cancellation.
 
 ```go
-newTitle := "New Task Title"
-shareVisibility := "team"
-hideInTaskList := false
-
-updated, err := client.UpdateTask("task_id", &manusai.TaskUpdate{
-    Title:           &newTitle,
-    ShareVisibility: &shareVisibility,
-    HideInTaskList:  &hideInTaskList,
-})
+messages, err := client.ListMessages(task.TaskID, 50, "", "desc", true)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
+
+_, err = client.SendMessage(task.TaskID, "Please make the summary more concise.", nil)
+if err != nil {
+	log.Fatal(err)
+}
+
+_, err = client.StopTask(task.TaskID)
 ```
 
-#### Delete Task
+When Manus asks the user to confirm an action, pass the task ID, event ID, and the input required by the API:
 
 ```go
-result, err := client.DeleteTask("task_id")
-if err != nil {
-    log.Fatal(err)
-}
-
-fmt.Printf("Deleted: %v\n", result.Deleted)
-```
-
-### File Management
-
-File uploads use a two-step process: create a file record to get a presigned URL, then upload content to that URL.
-
-**API Documentation:** [Files API Reference](https://open.manus.ai/docs/api-reference/create-file)
-
-#### Upload a File
-
-```go
-// 1. Create file record
-fileResult, err := client.CreateFile("document.pdf")
-if err != nil {
-    log.Fatal(err)
-}
-
-// 2. Upload file content
-fileContent, _ := os.ReadFile("/path/to/document.pdf")
-err = client.UploadFileContent(
-    fileResult.UploadURL,
-    fileContent,
-    "application/pdf",
-)
-if err != nil {
-    log.Fatal(err)
-}
-
-// 3. Use file in task
-attachment := manusai.NewAttachmentFromFileID(fileResult.ID)
-
-task, err := client.CreateTask("Analyze this document", &manusai.TaskOptions{
-    Attachments: []interface{}{attachment},
+_, err := client.ConfirmAction(task.TaskID, "event_123", map[string]interface{}{
+	"confirmed": true,
 })
 ```
 
-#### Different Attachment Types
+## Files and attachments
+
+The usual file flow has three stages: request an upload URL, upload bytes to that URL, then include the returned file ID in a task.
 
 ```go
-// From file ID
-attachment1 := manusai.NewAttachmentFromFileID("file_123")
-
-// From URL
-attachment2 := manusai.NewAttachmentFromURL("https://example.com/image.jpg")
-
-// From base64
-attachment3 := manusai.NewAttachmentFromBase64(base64Data, "image/png")
-
-// From local file path
-attachment4, err := manusai.NewAttachmentFromFilePath("/path/to/file.pdf")
+contents, err := os.ReadFile("report.pdf")
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
+
+file, err := client.CreateFile("report.pdf")
+if err != nil {
+	log.Fatal(err)
+}
+if err := client.UploadFileContent(file.UploadURL, contents, "application/pdf"); err != nil {
+	log.Fatal(err)
+}
+
+task, err := client.CreateTask("Review the attached report.", &manusai.TaskOptions{
+	Attachments: []interface{}{manusai.NewAttachmentFromFileID(file.FileID)},
+})
 ```
 
-#### List Files
+There are helpers for every supported attachment source:
 
 ```go
-files, err := client.ListFiles()
-if err != nil {
-    log.Fatal(err)
-}
-
-for _, file := range files.Data {
-    fmt.Printf("%s - %s\n", file.Filename, file.Status)
-}
+fromFileID := manusai.NewAttachmentFromFileID("file_123")
+fromURL := manusai.NewAttachmentFromURL("https://example.com/report.pdf")
+fromBase64 := manusai.NewAttachmentFromBase64(encoded, "application/pdf")
+fromPath, err := manusai.NewAttachmentFromFilePath("report.pdf")
 ```
 
-#### Delete File
+`NewAttachmentFromFilePath` reads the complete local file into memory. Prefer the upload flow for large files. `CreateTask` and `SendMessage` accept attachments created by these helpers (or equivalent `map[string]interface{}` values); invalid attachment values are rejected rather than silently dropped.
+
+To list or delete files:
 
 ```go
-result, err := client.DeleteFile("file_id")
+files, err := client.ListFiles(20, "")
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
+for _, file := range files.Files {
+	fmt.Println(file.FileID, file.Filename, file.Status)
+}
+
+_, err = client.DeleteFile("file_123")
 ```
 
-### Webhooks
+## Webhooks
 
-Manus AI sends HTTP POST requests to your endpoint on task events instead of requiring polling.
-
-**API Documentation:** [Webhooks Guide](https://open.manus.ai/docs/webhooks/index)
-
-#### Create Webhook
+Webhooks are preferable to frequent polling when your application needs to react to task events. Your endpoint must be publicly reachable by Manus and should validate any authentication or signature mechanism required by the Manus webhook documentation.
 
 ```go
-webhook := &manusai.WebhookConfig{
-    URL:    "https://your-domain.com/webhook/manus-ai",
-    Events: []string{"task_created", "task_stopped"},
-}
-
-result, err := client.CreateWebhook(webhook)
-if err != nil {
-    log.Fatal(err)
-}
-
-fmt.Printf("Webhook ID: %s\n", result.WebhookID)
+_, err := client.CreateWebhook(&manusai.WebhookConfig{
+	URL:    "https://example.com/webhooks/manus",
+	Events: []string{"task_created", "task_stopped"},
+})
 ```
 
-#### Handle Webhook Events
+The helper below parses the body and distinguishes a finished task from a task waiting for the user:
 
 ```go
-import (
-    "io"
-    "net/http"
-    
-    manusai "github.com/tigusigalpa/manus-ai-go"
-)
-
 func handleWebhook(w http.ResponseWriter, r *http.Request) {
-    body, _ := io.ReadAll(r.Body)
-    defer r.Body.Close()
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
 
-    payload, err := manusai.ParseWebhookPayload(body)
-    if err != nil {
-        http.Error(w, "Invalid payload", http.StatusBadRequest)
-        return
-    }
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "could not read request", http.StatusBadRequest)
+		return
+	}
+	payload, err := manusai.ParseWebhookPayload(body)
+	if err != nil {
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
+	}
 
-    if manusai.IsTaskCompleted(payload) {
-        taskDetail := manusai.GetTaskDetail(payload)
-        attachments := manusai.GetAttachments(payload)
-        
-        fmt.Printf("Task completed: %v\n", taskDetail["task_id"])
-        fmt.Printf("Message: %v\n", taskDetail["message"])
-        
-        // Download attachments
-        for _, att := range attachments {
-            if attMap, ok := att.(map[string]interface{}); ok {
-                fmt.Printf("File: %v\n", attMap["file_name"])
-                fmt.Printf("URL: %v\n", attMap["url"])
-            }
-        }
-    }
-
-    if manusai.IsTaskAskingForInput(payload) {
-        taskDetail := manusai.GetTaskDetail(payload)
-        fmt.Printf("Input required: %v\n", taskDetail["message"])
-    }
-
-    w.WriteHeader(http.StatusOK)
+	switch {
+	case manusai.IsTaskCompleted(payload):
+		fmt.Printf("Task completed: %#v\n", manusai.GetTaskDetail(payload))
+	case manusai.IsTaskAskingForInput(payload):
+		fmt.Printf("Task needs input: %#v\n", manusai.GetTaskDetail(payload))
+	}
+	w.WriteHeader(http.StatusOK)
 }
 ```
 
-#### Delete Webhook
+`GetAttachments(payload)` returns the attachments supplied with a webhook task detail, or `nil` when none are present. Delete a webhook with `client.DeleteWebhook(webhookID)` when it is no longer needed.
+
+## Errors
+
+The SDK returns ordinary Go errors. Its API errors can be inspected with `errors.As`:
 
 ```go
-err := client.DeleteWebhook("webhook_id")
+_, err := client.GetTask("missing-task")
 if err != nil {
-    log.Fatal(err)
+	var authErr *manusai.AuthenticationError
+	var validationErr *manusai.ValidationError
+	switch {
+	case errors.As(err, &authErr):
+		log.Printf("check the API key: %s", authErr.Message)
+	case errors.As(err, &validationErr):
+		log.Printf("fix the request: %s", validationErr.Message)
+	default:
+		log.Printf("Manus request failed: %v", err)
+	}
 }
 ```
 
-## API Reference
+`AuthenticationError` represents 401 and 403 responses; `ValidationError` represents 400 responses; other HTTP and transport errors are represented by `ManusAIError`. Each error includes `StatusCode` when an HTTP response was received.
 
-### Client Methods
+## API summary
 
-#### Task Methods
+| Area | Methods |
+| --- | --- |
+| Tasks | `CreateTask`, `GetTasks`, `GetTask`, `UpdateTask`, `DeleteTask`, `ListMessages`, `SendMessage`, `StopTask`, `ConfirmAction` |
+| Files | `CreateFile`, `UploadFileContent`, `ListFiles(limit, cursor)`, `GetFile`, `DeleteFile` |
+| Webhooks | `CreateWebhook`, `DeleteWebhook`, `ParseWebhookPayload` and predicate helpers |
 
-- `CreateTask(prompt string, options *TaskOptions) (*TaskResponse, error)`
-- `GetTasks(filters *TaskFilters) (*TaskListResponse, error)`
-- `GetTask(taskID string) (*TaskDetail, error)`
-- `UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, error)`
-- `DeleteTask(taskID string) (*DeleteResponse, error)`
+The `examples/` directory contains complete programs for [basic task management](examples/basic), [file upload](examples/file-upload), and [webhook handling](examples/webhook).
 
-#### File Methods
+## Development
 
-- `CreateFile(filename string) (*FileResponse, error)`
-- `UploadFileContent(uploadURL string, fileContent []byte, contentType string) error`
-- `ListFiles() (*FileListResponse, error)`
-- `GetFile(fileID string) (*FileDetail, error)`
-- `DeleteFile(fileID string) (*DeleteResponse, error)`
-
-#### Webhook Methods
-
-- `CreateWebhook(webhook *WebhookConfig) (*WebhookResponse, error)`
-- `DeleteWebhook(webhookID string) error`
-
-### Helper Functions
-
-#### Agent Profile
-
-- `AllAgentProfiles() []string` - Get all available profiles
-- `RecommendedAgentProfiles() []string` - Get recommended profiles
-- `IsValidAgentProfile(profile string) bool` - Check if profile is valid
-- `IsDeprecatedAgentProfile(profile string) bool` - Check if profile is deprecated
-
-#### Attachments
-
-- `NewAttachmentFromFileID(fileID string) map[string]interface{}`
-- `NewAttachmentFromURL(url string) map[string]interface{}`
-- `NewAttachmentFromBase64(base64Data, mimeType string) map[string]interface{}`
-- `NewAttachmentFromFilePath(filePath string) (map[string]interface{}, error)`
-
-#### Webhook Handlers
-
-- `ParseWebhookPayload(jsonPayload []byte) (*WebhookPayload, error)`
-- `IsTaskCreated(payload *WebhookPayload) bool`
-- `IsTaskStopped(payload *WebhookPayload) bool`
-- `IsTaskCompleted(payload *WebhookPayload) bool`
-- `IsTaskAskingForInput(payload *WebhookPayload) bool`
-- `GetTaskDetail(payload *WebhookPayload) map[string]interface{}`
-- `GetAttachments(payload *WebhookPayload) []interface{}`
-
-### Error Types
-
-The SDK provides custom error types for better error handling:
-
-- `ManusAIError` - General API errors
-- `AuthenticationError` - Authentication/authorization failures
-- `ValidationError` - Request validation errors
-
-```go
-_, err := client.GetTask("invalid_id")
-if err != nil {
-    switch e := err.(type) {
-    case *manusai.AuthenticationError:
-        fmt.Println("Authentication failed:", e.Message)
-    case *manusai.ValidationError:
-        fmt.Println("Validation error:", e.Message)
-    case *manusai.ManusAIError:
-        fmt.Println("API error:", e.Message)
-    default:
-        fmt.Println("Unknown error:", err)
-    }
-}
-```
-
-## Examples
-
-See the `examples/` directory for complete working examples:
-
-- `examples/basic/` - Basic task creation and management
-- `examples/file-upload/` - File upload with attachments
-- `examples/webhook/` - Webhook setup and handling
-
-To run an example:
+Run the complete local check suite:
 
 ```bash
-export MANUS_AI_API_KEY=your-api-key
-cd examples/basic
-go run main.go
+gofmt -w .
+go vet ./...
+go test ./...
 ```
 
-## Testing
+Or, when `make` is available:
 
 ```bash
-go test -v ./...
+make check
 ```
-
-Run with coverage:
-
-```bash
-go test -v -cover ./...
-```
-
-Generate coverage report:
-
-```bash
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-MIT License — see [LICENSE](LICENSE).
 
 ## Migration from v1
 
-### Breaking Changes
+Version 2 uses Manus API v2. Imports must end in `/v2`; requests use the `x-manus-api-key` header; endpoints use names such as `/v2/task.create`; and task creation now sends a structured `message.content` payload. The v1 `TaskMode` field no longer exists. In v2 use `TaskDetail.AgentStatus`, `TaskListResponse.Tasks`, `FileResponse.FileID`, and `FileListResponse.Files` rather than the old v1 field names.
 
-1. **API Endpoints**: All endpoints changed from `/v1/` to `/v2/` with new naming (e.g., `/v2/task.create`)
+## License
 
-2. **Authentication Header**: Changed from `Authorization` to `x-manus-api-key`
-
-3. **Request Structure**: Tasks now use message-based format:
-   ```go
-   // v1
-   payload := map[string]interface{}{
-       "prompt": "Hello",
-       "agentProfile": "manus-1.6",
-   }
-   
-   // v2
-   payload := map[string]interface{}{
-       "message": map[string]interface{}{
-           "content": []map[string]interface{}{
-               {"type": "text", "text": "Hello"},
-           },
-       },
-       "agent_profile": "manus-1.6",
-   }
-   ```
-
-4. **Response Format**: All responses now include `ok` and `request_id` fields
-
-5. **Field Names**: Snake_case instead of camelCase:
-    - `agentProfile` → `agent_profile`
-    - `hideInTaskList` → `hide_in_task_list`
-    - `createShareableLink` → `share_visibility`
-
-6. **Task Status**: `Status` → `AgentStatus`
-
-7. **Timestamps**: Changed from string to int64 (Unix milliseconds)
-
-8. **Attachments**: New structure with `file_id`, `file_url`, `file_data`
-
-9. **Removed Fields**:
-    - `TaskMode` (no longer needed)
-    - `CreateShareableLink` (replaced by `ShareVisibility`)
-
-10. **New Methods**:
-    - `ListMessages()` - Poll task progress
-    - `SendMessage()` - Continue conversations
-    - `StopTask()` - Stop running tasks
-    - `ConfirmAction()` - Confirm pending actions
-
-### Migration Example
-
-```go
-// v1
-task, err := client.CreateTask("Hello", &manusai.TaskOptions{
-    AgentProfile: "manus-1.6",
-    TaskMode:     "agent",
-})
-
-// v2
-task, err := client.CreateTask("Hello", &manusai.TaskOptions{
-    AgentProfile:    manusai.AgentProfileManus16,
-    ShareVisibility: "private",
-})
-
-// v2: Poll for progress
-messages, _ := client.ListMessages(task.TaskID, 50, "", "desc", false)
-```
-
-## Links
-
-- [Manus AI](https://manus.ai)
-- [API v2 Documentation](https://open.manus.im/docs/v2/introduction)
-- [GitHub Repository](https://github.com/tigusigalpa/manus-ai-go)
-- [Issues](https://github.com/tigusigalpa/manus-ai-go/issues)
-
-## Author
-
-**Igor Sazonov**
-
-- GitHub: [@tigusigalpa](https://github.com/tigusigalpa)
-- Email: sovletig@gmail.com
-
-Also see the PHP SDK: [manus-ai-php](https://github.com/tigusigalpa/manus-ai-php)
+Released under the [MIT License](LICENSE).
