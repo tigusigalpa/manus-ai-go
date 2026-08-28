@@ -82,17 +82,6 @@ func main() {
 		fmt.Printf("Task ID: %s\n", task3.TaskID)
 	}
 
-	fmt.Println("\n=== Listing Files ===")
-	files, err := client.ListFiles(20, "")
-	if err != nil {
-		log.Fatalf("Failed to list files: %v", err)
-	}
-
-	fmt.Printf("Found %d files\n", len(files.Files))
-	for i, f := range files.Files {
-		fmt.Printf("%d. %s - %s (Status: %s)\n", i+1, f.FileID, f.Filename, f.Status)
-	}
-
 	fmt.Println("\n=== Deleting File ===")
 	deleteResult, err := client.DeleteFile(fileResult.FileID)
 	if err != nil {

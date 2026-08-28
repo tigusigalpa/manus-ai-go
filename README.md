@@ -95,6 +95,8 @@ client, err := manusai.NewClient(apiKey,
 
 `WithTimeout` changes the timeout on the SDK's HTTP client. If you need a custom transport, retry policy, proxy, or tracing, create an `http.Client` yourself and pass it with `WithHTTPClient`.
 
+For OAuth Open Apps, create the client with an empty API-key argument and `WithBearerToken(accessToken)`. The SDK sends either `Authorization: Bearer …` or `x-manus-api-key`, never both.
+
 ## Working with tasks
 
 ### Create a task
@@ -215,17 +217,9 @@ fromPath, err := manusai.NewAttachmentFromFilePath("report.pdf")
 
 `NewAttachmentFromFilePath` reads the complete local file into memory. Prefer the upload flow for large files. `CreateTask` and `SendMessage` accept attachments created by these helpers (or equivalent `map[string]interface{}` values); invalid attachment values are rejected rather than silently dropped.
 
-To list or delete files:
+The v2 API does not expose a file-list endpoint. Keep the file ID returned by `CreateFile` if you need to inspect or delete a file later:
 
 ```go
-files, err := client.ListFiles(20, "")
-if err != nil {
-	log.Fatal(err)
-}
-for _, file := range files.Files {
-	fmt.Println(file.FileID, file.Filename, file.Status)
-}
-
 _, err = client.DeleteFile("file_123")
 ```
 
@@ -235,8 +229,7 @@ Webhooks are preferable to frequent polling when your application needs to react
 
 ```go
 _, err := client.CreateWebhook(&manusai.WebhookConfig{
-	URL:    "https://example.com/webhooks/manus",
-	Events: []string{"task_created", "task_stopped"},
+	URL: "https://example.com/webhooks/manus",
 })
 ```
 
@@ -310,8 +303,11 @@ if err != nil {
 | Area | Methods |
 | --- | --- |
 | Tasks | `CreateTask`, `GetTasks`, `GetTask`, `UpdateTask`, `DeleteTask`, `ListMessages`, `SendMessage`, `StopTask`, `ConfirmAction` |
-| Files | `CreateFile`, `UploadFileContent`, `ListFiles(limit, cursor)`, `GetFile`, `DeleteFile` |
-| Webhooks | `CreateWebhook`, `DeleteWebhook`, `ParseWebhookPayload` and predicate helpers |
+| Files | `CreateFile`, `UploadFileContent`, `GetFile`, `DeleteFile` |
+| Projects and discovery | `CreateProject`, `ListProjects`, `ListSkills`, `ListAgents`, `GetAgent`, `UpdateAgent`, `ListConnectors` |
+| Webhooks and browser | `CreateWebhook`, `ListWebhooks`, `DeleteWebhook`, `GetWebhookPublicKey`, `ListOnlineBrowserClients`, `ParseWebhookPayload` and predicate helpers |
+| Usage | `ListUsage`, `GetTeamUsageStatistic`, `ListTeamUsageLog`, `GetAvailableCredits` |
+| Websites | `GetWebsiteStatus`, `ListWebsiteCheckpoints`, `PublishWebsite`, `UpdateWebsite` |
 
 The `examples/` directory contains complete programs for [basic task management](examples/basic), [file upload](examples/file-upload), and [webhook handling](examples/webhook).
 
@@ -333,7 +329,9 @@ make check
 
 ## Migration from v1
 
-Version 2 uses Manus API v2. Imports must end in `/v2`; requests use the `x-manus-api-key` header; endpoints use names such as `/v2/task.create`; and task creation now sends a structured `message.content` payload. The v1 `TaskMode` field no longer exists. In v2 use `TaskDetail.AgentStatus`, `TaskListResponse.Tasks`, `FileResponse.FileID`, and `FileListResponse.Files` rather than the old v1 field names.
+Version 2 uses Manus API v2. Imports must end in `/v2`; requests use the `x-manus-api-key` header; endpoints use names such as `/v2/task.create`; and task creation now sends a structured `message.content` payload.
+
+> **OpenAPI alignment (v2.1.8):** `interactive_mode` and `enable_visible_in_task_list` are the current API fields. `EnableAskUser` and `HideInTaskList` remain as compatibility aliases. `ListFiles` is deprecated because the official v2 API has no `/v2/file.list` endpoint. The legacy `speed` and `quality` agent profiles are likewise no longer sent as valid v2 profiles.
 
 ## License
 

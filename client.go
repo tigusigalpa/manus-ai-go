@@ -33,9 +33,10 @@ const (
 
 // Client is a Manus API v2 client.
 type Client struct {
-	apiKey     string
-	baseURL    string
-	httpClient *http.Client
+	apiKey      string
+	bearerToken string
+	baseURL     string
+	httpClient  *http.Client
 }
 
 // ClientOption configures a Client created by NewClient.
@@ -55,6 +56,13 @@ func WithHTTPClient(httpClient *http.Client) ClientOption {
 	}
 }
 
+// WithBearerToken authenticates requests with an OAuth access token instead of an API key.
+func WithBearerToken(token string) ClientOption {
+	return func(c *Client) {
+		c.bearerToken = strings.TrimSpace(token)
+	}
+}
+
 // WithTimeout sets the overall timeout for requests made by the SDK client.
 func WithTimeout(timeout time.Duration) ClientOption {
 	return func(c *Client) {
@@ -67,10 +75,6 @@ func WithTimeout(timeout time.Duration) ClientOption {
 
 // NewClient creates a Client using apiKey and optional configuration.
 func NewClient(apiKey string, opts ...ClientOption) (*Client, error) {
-	if strings.TrimSpace(apiKey) == "" {
-		return nil, &AuthenticationError{Message: "API key cannot be empty"}
-	}
-
 	client := &Client{
 		apiKey:  apiKey,
 		baseURL: DefaultBaseURL,
@@ -88,6 +92,12 @@ func NewClient(apiKey string, opts ...ClientOption) (*Client, error) {
 
 	if client.httpClient == nil {
 		return nil, &ValidationError{Message: "HTTP client cannot be nil"}
+	}
+	if strings.TrimSpace(client.apiKey) == "" && client.bearerToken == "" {
+		return nil, &AuthenticationError{Message: "API key or bearer token cannot be empty"}
+	}
+	if strings.TrimSpace(client.apiKey) != "" && client.bearerToken != "" {
+		return nil, &ValidationError{Message: "API key and bearer token cannot be used together"}
 	}
 
 	baseURL, err := url.ParseRequestURI(client.baseURL)
@@ -164,8 +174,15 @@ func applyTaskOptions(payload, message map[string]interface{}, options *TaskOpti
 	if options.ProjectID != "" {
 		payload["project_id"] = options.ProjectID
 	}
-	if options.EnableAskUser != nil {
-		payload["enable_ask_user"] = *options.EnableAskUser
+	interactiveMode := options.InteractiveMode
+	if interactiveMode == nil {
+		interactiveMode = options.EnableAskUser
+	}
+	if interactiveMode != nil {
+		payload["interactive_mode"] = *interactiveMode
+	}
+	if options.StructuredOutputSchema != nil {
+		payload["structured_output_schema"] = options.StructuredOutputSchema
 	}
 	if len(options.Connectors) > 0 {
 		message["connectors"] = options.Connectors
@@ -221,6 +238,12 @@ func (c *Client) GetTasks(filters *TaskFilters) (*TaskListResponse, error) {
 		if filters.ProjectID != "" {
 			query.Set("project_id", filters.ProjectID)
 		}
+		if filters.OAuthClientID != "" {
+			query.Set("oauth_client_id", filters.OAuthClientID)
+		}
+		if filters.APIKeyID != "" {
+			query.Set("api_key_id", filters.APIKeyID)
+		}
 	}
 
 	var result TaskListResponse
@@ -241,13 +264,20 @@ func (c *Client) GetTask(taskID string) (*TaskDetail, error) {
 	query := url.Values{}
 	query.Set(taskIDField, taskID)
 
-	var result TaskDetail
-	err := c.request("GET", "/v2/task.detail", nil, query, &result)
+	var response struct {
+		OK        bool        `json:"ok"`
+		RequestID string      `json:"request_id"`
+		Task      TaskSummary `json:"task"`
+	}
+	err := c.request("GET", "/v2/task.detail", nil, query, &response)
 	if err != nil {
 		return nil, err
 	}
-
-	return &result, nil
+	return &TaskDetail{
+		OK: response.OK, RequestID: response.RequestID, ID: response.Task.ID, Title: response.Task.Title,
+		AgentStatus: response.Task.AgentStatus, ShareVisibility: response.Task.ShareVisibility,
+		CreditUsage: response.Task.CreditUsage, TaskURL: response.Task.TaskURL, CreatedAt: response.Task.CreatedAt, UpdatedAt: response.Task.UpdatedAt,
+	}, nil
 }
 
 // UpdateTask updates the supported fields of taskID.
@@ -273,8 +303,13 @@ func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, er
 		payload["share_visibility"] = *updates.ShareVisibility
 		hasUpdates = true
 	}
-	if updates.HideInTaskList != nil {
-		payload["hide_in_task_list"] = *updates.HideInTaskList
+	visibleInTaskList := updates.EnableVisibleInTaskList
+	if visibleInTaskList == nil && updates.HideInTaskList != nil {
+		visible := !*updates.HideInTaskList
+		visibleInTaskList = &visible
+	}
+	if visibleInTaskList != nil {
+		payload["enable_visible_in_task_list"] = *visibleInTaskList
 		hasUpdates = true
 	}
 
@@ -320,13 +355,23 @@ func (c *Client) CreateFile(filename string) (*FileResponse, error) {
 		"filename": filename,
 	}
 
-	var result FileResponse
-	err := c.request("POST", "/v2/file.upload", payload, nil, &result)
+	var response struct {
+		OK        bool   `json:"ok"`
+		RequestID string `json:"request_id"`
+		File      struct {
+			ID        string `json:"id"`
+			Filename  string `json:"filename"`
+			Status    string `json:"status"`
+			CreatedAt int64  `json:"created_at"`
+		} `json:"file"`
+		UploadURL       string `json:"upload_url"`
+		UploadExpiresAt int64  `json:"upload_expires_at"`
+	}
+	err := c.request("POST", "/v2/file.upload", payload, nil, &response)
 	if err != nil {
 		return nil, err
 	}
-
-	return &result, nil
+	return &FileResponse{OK: response.OK, RequestID: response.RequestID, FileID: response.File.ID, Filename: response.File.Filename, UploadURL: response.UploadURL, ExpiresAt: response.UploadExpiresAt}, nil
 }
 
 // UploadFileContent uploads fileContent to a URL returned by CreateFile.
@@ -363,23 +408,9 @@ func (c *Client) UploadFileContent(uploadURL string, fileContent []byte, content
 	return nil
 }
 
-// ListFiles returns files using optional cursor pagination.
+// ListFiles is deprecated because Manus API v2 has no file-list operation.
 func (c *Client) ListFiles(limit int, cursor string) (*FileListResponse, error) {
-	query := url.Values{}
-	if limit > 0 {
-		query.Set("limit", fmt.Sprintf("%d", limit))
-	}
-	if cursor != "" {
-		query.Set("cursor", cursor)
-	}
-
-	var result FileListResponse
-	err := c.request("GET", "/v2/file.list", nil, query, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return &result, nil
+	return nil, &ValidationError{Message: "Manus API v2 does not provide a file-list endpoint"}
 }
 
 // GetFile returns metadata for fileID.
@@ -391,13 +422,23 @@ func (c *Client) GetFile(fileID string) (*FileDetail, error) {
 	query := url.Values{}
 	query.Set(fileIDField, fileID)
 
-	var result FileDetail
-	err := c.request("GET", "/v2/file.detail", nil, query, &result)
+	var response struct {
+		OK        bool   `json:"ok"`
+		RequestID string `json:"request_id"`
+		File      struct {
+			ID        string `json:"id"`
+			Filename  string `json:"filename"`
+			Status    string `json:"status"`
+			Bytes     int64  `json:"bytes"`
+			CreatedAt int64  `json:"created_at"`
+			ExpiresAt int64  `json:"expires_at"`
+		} `json:"file"`
+	}
+	err := c.request("GET", "/v2/file.detail", nil, query, &response)
 	if err != nil {
 		return nil, err
 	}
-
-	return &result, nil
+	return &FileDetail{OK: response.OK, RequestID: response.RequestID, FileID: response.File.ID, Filename: response.File.Filename, Status: response.File.Status, SizeBytes: response.File.Bytes, CreatedAt: response.File.CreatedAt, ExpiresAt: response.File.ExpiresAt}, nil
 }
 
 // DeleteFile deletes fileID and returns the API deletion result.
@@ -430,17 +471,21 @@ func (c *Client) CreateWebhook(webhook *WebhookConfig) (*WebhookResponse, error)
 	}
 
 	payload := map[string]interface{}{
-		"url":    webhook.URL,
-		"events": webhook.Events,
+		"url": webhook.URL,
 	}
 
-	var result WebhookResponse
-	err := c.request("POST", "/v2/webhook.create", payload, nil, &result)
+	var response struct {
+		OK        bool   `json:"ok"`
+		RequestID string `json:"request_id"`
+		Webhook   struct {
+			ID string `json:"id"`
+		} `json:"webhook"`
+	}
+	err := c.request("POST", "/v2/webhook.create", payload, nil, &response)
 	if err != nil {
 		return nil, err
 	}
-
-	return &result, nil
+	return &WebhookResponse{OK: response.OK, RequestID: response.RequestID, WebhookID: response.Webhook.ID}, nil
 }
 
 // DeleteWebhook deletes the webhook identified by webhookID.
@@ -593,7 +638,11 @@ func (c *Client) request(method, endpoint string, body interface{}, query url.Va
 		return &Error{Message: fmt.Sprintf("Failed to create request: %v", err)}
 	}
 
-	req.Header.Set("x-manus-api-key", c.apiKey)
+	if c.bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	} else {
+		req.Header.Set("x-manus-api-key", c.apiKey)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 

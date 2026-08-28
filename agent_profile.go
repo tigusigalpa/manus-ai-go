@@ -5,8 +5,10 @@ const (
 	AgentProfileManus16     = "manus-1.6"
 	AgentProfileManus16Lite = "manus-1.6-lite"
 	AgentProfileManus16Max  = "manus-1.6-max"
-	AgentProfileSpeed       = "speed"
-	AgentProfileQuality     = "quality"
+	// AgentProfileSpeed is retained for source compatibility but is not accepted by API v2.
+	AgentProfileSpeed = "speed"
+	// AgentProfileQuality is retained for source compatibility but is not accepted by API v2.
+	AgentProfileQuality = "quality"
 )
 
 var (
@@ -14,8 +16,6 @@ var (
 		AgentProfileManus16,
 		AgentProfileManus16Lite,
 		AgentProfileManus16Max,
-		AgentProfileSpeed,
-		AgentProfileQuality,
 	}
 
 	recommendedProfiles = []string{
@@ -54,7 +54,7 @@ func IsValidAgentProfile(profile string) bool {
 	return false
 }
 
-// IsDeprecatedAgentProfile reports whether profile is retained only for compatibility.
+// IsDeprecatedAgentProfile reports whether profile is retained only for compatibility and is not accepted by API v2.
 func IsDeprecatedAgentProfile(profile string) bool {
 	for _, p := range deprecatedProfiles {
 		if p == profile {

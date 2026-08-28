@@ -6,7 +6,7 @@ const changedProfile = "changed"
 
 func TestAgentProfiles(t *testing.T) {
 	profiles := AllAgentProfiles()
-	if len(profiles) != 5 || !IsValidAgentProfile(AgentProfileManus16) || !IsValidAgentProfile(AgentProfileQuality) {
+	if len(profiles) != 3 || !IsValidAgentProfile(AgentProfileManus16) || IsValidAgentProfile(AgentProfileQuality) {
 		t.Fatalf("unexpected profiles: %#v", profiles)
 	}
 	if IsValidAgentProfile("unknown") || IsValidAgentProfile("") {

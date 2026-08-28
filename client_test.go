@@ -93,6 +93,20 @@ func TestNewClient(t *testing.T) {
 			t.Fatalf("timeout = %v, want %v", client.httpClient.Timeout, time.Second)
 		}
 	})
+
+	t.Run("accepts an OAuth bearer token", func(t *testing.T) {
+		client, err := NewClient("", WithBearerToken("access-token"))
+		if err != nil || client.bearerToken != "access-token" {
+			t.Fatalf("NewClient() = (%#v, %v)", client, err)
+		}
+	})
+
+	t.Run("rejects both credential types", func(t *testing.T) {
+		client, err := NewClient(testAPIKey, WithBearerToken("access-token"))
+		if err == nil || client != nil {
+			t.Fatalf("NewClient() = (%#v, %v), want error", client, err)
+		}
+	})
 }
 
 func TestCreateTaskBuildsV2Request(t *testing.T) {
@@ -130,6 +144,23 @@ func TestCreateTaskBuildsV2Request(t *testing.T) {
 	}
 }
 
+func TestBearerTokenAuthentication(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer access-token" || r.Header.Get("x-manus-api-key") != "" {
+			t.Fatalf("unexpected authentication headers: %#v", r.Header)
+		}
+		_, _ = io.WriteString(w, `{"ok":true,"task":{"id":"task_123"}}`)
+	}))
+	defer server.Close()
+	client, err := NewClient("", WithBearerToken("access-token"), WithBaseURL(server.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetTask("task_123"); err != nil {
+		t.Fatalf("GetTask() error = %v", err)
+	}
+}
+
 func TestCreateTaskValidatesInput(t *testing.T) {
 	client, err := NewClient(testAPIKey)
 	if err != nil {
@@ -156,7 +187,7 @@ func TestTaskPayloadOptions(t *testing.T) {
 	hideInTaskList := true
 	enableAskUser := false
 	payload, err := newTaskPayload("Build a report", &TaskOptions{
-		AgentProfile:    AgentProfileQuality,
+		AgentProfile:    AgentProfileManus16,
 		Locale:          "ru-RU",
 		HideInTaskList:  &hideInTaskList,
 		ShareVisibility: "private",
@@ -171,7 +202,7 @@ func TestTaskPayloadOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newTaskPayload() error = %v", err)
 	}
-	if payload["locale"] != "ru-RU" || payload["hide_in_task_list"] != true || payload["enable_ask_user"] != false {
+	if payload["locale"] != "ru-RU" || payload["hide_in_task_list"] != true || payload["interactive_mode"] != false {
 		t.Fatalf("unexpected task options payload: %#v", payload)
 	}
 	message := payload[messageKey].(map[string]interface{})
@@ -240,7 +271,6 @@ func TestTaskAndFileRequests(t *testing.T) {
 		}, http.MethodPost, "/v2/task.update", nil, `{"ok":true,"id":"task_123"}`},
 		{"delete task", func(c *Client) error { _, err := c.DeleteTask("task_123"); return err }, http.MethodPost, "/v2/task.delete", nil, `{"ok":true,"deleted":true}`},
 		{"create file", func(c *Client) error { _, err := c.CreateFile("report.pdf"); return err }, http.MethodPost, "/v2/file.upload", nil, `{"ok":true,"file_id":"file_123"}`},
-		{"list files", func(c *Client) error { _, err := c.ListFiles(5, "next"); return err }, http.MethodGet, "/v2/file.list", url.Values{"limit": {"5"}, "cursor": {"next"}}, `{"ok":true,"files":[]}`},
 		{"get file", func(c *Client) error { _, err := c.GetFile("file_123"); return err }, http.MethodGet, "/v2/file.detail", url.Values{"file_id": {"file_123"}}, `{"ok":true,"file_id":"file_123"}`},
 		{"delete file", func(c *Client) error { _, err := c.DeleteFile("file_123"); return err }, http.MethodPost, "/v2/file.delete", nil, `{"ok":true,"deleted":true}`},
 		{"create webhook", func(c *Client) error {
@@ -354,5 +384,66 @@ func TestRequestAndResponseFailurePaths(t *testing.T) {
 	tooLarge := bytes.Repeat([]byte("x"), maxResponseBodySize+1)
 	if _, err := readResponseBody(bytes.NewReader(tooLarge)); err == nil {
 		t.Fatal("readResponseBody() accepted an oversized body")
+	}
+}
+
+func TestAdditionalOpenAPIResources(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		method   string
+		response string
+		call     func(*Client) error
+	}{
+		{"create project", "/v2/project.create", http.MethodPost, `{"ok":true,"project":{"id":"project_123","name":"Reports"}}`, func(c *Client) error { _, err := c.CreateProject("Reports", "Use Russian"); return err }},
+		{"list projects", "/v2/project.list", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error { _, err := c.ListProjects(); return err }},
+		{"list skills", "/v2/skill.list", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error { _, err := c.ListSkills("project_123"); return err }},
+		{"list agents", "/v2/agent.list", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error { _, err := c.ListAgents(); return err }},
+		{"get agent", "/v2/agent.detail", http.MethodGet, `{"ok":true,"agent":{"id":"agent_123"}}`, func(c *Client) error { _, err := c.GetAgent("agent_123"); return err }},
+		{"update agent", "/v2/agent.update", http.MethodPost, `{"ok":true,"agent":{"id":"agent_123"}}`, func(c *Client) error { _, err := c.UpdateAgent("agent_123", "Researcher", "Finds sources"); return err }},
+		{"list webhooks", "/v2/webhook.list", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error { _, err := c.ListWebhooks(); return err }},
+		{"list browser clients", "/v2/browser.onlineList", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error { _, err := c.ListOnlineBrowserClients(); return err }},
+		{"get webhook public key", "/v2/webhook.publicKey", http.MethodGet, `{"ok":true,"public_key":"key","algorithm":"RSA"}`, func(c *Client) error { _, err := c.GetWebhookPublicKey(); return err }},
+		{"list connectors", "/v2/connector.list", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error { _, err := c.ListConnectors(); return err }},
+		{"list usage", "/v2/usage.list", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error { _, err := c.ListUsage(20, "next"); return err }},
+		{"team usage statistic", "/v2/usage.teamStatistic", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error { _, err := c.GetTeamUsageStatistic("2026-01-01", "2026-01-31"); return err }},
+		{"team usage log", "/v2/usage.teamLog", http.MethodGet, `{"ok":true,"data":[]}`, func(c *Client) error {
+			ascending := true
+			_, err := c.ListTeamUsageLog(20, "next", "2026-01-01", "2026-01-31", "credits", &ascending)
+			return err
+		}},
+		{"available credits", "/v2/usage.availableCredits", http.MethodGet, `{"ok":true,"data":{}}`, func(c *Client) error { _, err := c.GetAvailableCredits(); return err }},
+		{"website status", "/v2/website.status", http.MethodGet, `{"ok":true,"website_id":"website_123"}`, func(c *Client) error { _, err := c.GetWebsiteStatus("task_123", "website_123"); return err }},
+		{"website checkpoints", "/v2/website.listCheckpoints", http.MethodGet, `{"ok":true,"website_id":"website_123","data":[]}`, func(c *Client) error { _, err := c.ListWebsiteCheckpoints("task_123", "website_123"); return err }},
+		{"publish website", "/v2/website.publish", http.MethodPost, `{"ok":true,"website_id":"website_123"}`, func(c *Client) error { _, err := c.PublishWebsite("task_123", "website_123", "public"); return err }},
+		{"update website", "/v2/website.update", http.MethodPost, `{"ok":true}`, func(c *Client) error { return c.UpdateWebsite("task_123", "website_123", "Title", "") }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != tt.method || r.URL.Path != tt.path {
+					t.Fatalf("request = %s %s, want %s %s", r.Method, r.URL.Path, tt.method, tt.path)
+				}
+				if tt.name == "list skills" && r.URL.Query().Get("project_id") != "project_123" {
+					t.Fatalf("project_id = %q", r.URL.Query().Get("project_id"))
+				}
+				_, _ = io.WriteString(w, tt.response)
+			})
+			if err := tt.call(client); err != nil {
+				t.Fatalf("request error = %v", err)
+			}
+		})
+	}
+
+	client, _ := NewClient(testAPIKey)
+	if _, err := client.CreateProject("", ""); err == nil {
+		t.Fatal("CreateProject() accepted an empty name")
+	}
+	if _, err := client.GetAgent(""); err == nil {
+		t.Fatal("GetAgent() accepted an empty agent ID")
+	}
+	if _, err := client.UpdateAgent("agent_123", "", ""); err == nil {
+		t.Fatal("UpdateAgent() accepted an empty update")
 	}
 }

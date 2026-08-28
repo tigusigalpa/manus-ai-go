@@ -95,6 +95,8 @@ client, err := manusai.NewClient(apiKey,
 
 `WithTimeout` меняет таймаут HTTP-клиента библиотеки. Если нужен собственный transport, повторные попытки или трассировка, создайте `http.Client` самостоятельно и передайте его через `WithHTTPClient`.
 
+Для OAuth Open Apps создайте клиент с пустым аргументом API-ключа и `WithBearerToken(accessToken)`. Библиотека отправляет либо `Authorization: Bearer …`, либо `x-manus-api-key`, но не оба заголовка.
+
 ## Работа с задачами
 
 ### Создание
@@ -206,15 +208,9 @@ fromPath, err := manusai.NewAttachmentFromFilePath("report.pdf")
 
 `NewAttachmentFromFilePath` полностью читает файл в память, поэтому для больших файлов лучше использовать поток «создать слот → загрузить → приложить». Некорректные элементы `Attachments` теперь возвращают ошибку, а не исчезают из запроса молча.
 
-```go
-files, err := client.ListFiles(20, "")
-if err != nil {
-	log.Fatal(err)
-}
-for _, file := range files.Files {
-	fmt.Println(file.FileID, file.Filename, file.Status)
-}
+В API v2 нет endpoint для списка файлов. Сохраните ID из `CreateFile`, чтобы позднее проверить или удалить файл:
 
+```go
 _, err = client.DeleteFile("file_123")
 ```
 
@@ -224,8 +220,7 @@ _, err = client.DeleteFile("file_123")
 
 ```go
 _, err := client.CreateWebhook(&manusai.WebhookConfig{
-	URL:    "https://example.com/webhooks/manus",
-	Events: []string{"task_created", "task_stopped"},
+	URL: "https://example.com/webhooks/manus",
 })
 ```
 
@@ -296,8 +291,11 @@ case err != nil:
 | Область | Методы |
 | --- | --- |
 | Задачи | `CreateTask`, `GetTasks`, `GetTask`, `UpdateTask`, `DeleteTask`, `ListMessages`, `SendMessage`, `StopTask`, `ConfirmAction` |
-| Файлы | `CreateFile`, `UploadFileContent`, `ListFiles(limit, cursor)`, `GetFile`, `DeleteFile` |
-| Вебхуки | `CreateWebhook`, `DeleteWebhook`, `ParseWebhookPayload` и функции-предикаты |
+| Файлы | `CreateFile`, `UploadFileContent`, `GetFile`, `DeleteFile` |
+| Проекты и справочники | `CreateProject`, `ListProjects`, `ListSkills`, `ListAgents`, `GetAgent`, `UpdateAgent`, `ListConnectors` |
+| Вебхуки и браузер | `CreateWebhook`, `ListWebhooks`, `DeleteWebhook`, `GetWebhookPublicKey`, `ListOnlineBrowserClients`, `ParseWebhookPayload` и функции-предикаты |
+| Использование кредитов | `ListUsage`, `GetTeamUsageStatistic`, `ListTeamUsageLog`, `GetAvailableCredits` |
+| Сайты | `GetWebsiteStatus`, `ListWebsiteCheckpoints`, `PublishWebsite`, `UpdateWebsite` |
 
 Готовые программы находятся в [examples/basic](examples/basic), [examples/file-upload](examples/file-upload) и [examples/webhook](examples/webhook).
 
@@ -313,7 +311,9 @@ go test ./...
 
 ## Переход с v1
 
-Версия 2 использует Manus API v2. Импорт должен оканчиваться на `/v2`; ключ передаётся в заголовке `x-manus-api-key`; вызовы идут на endpoints наподобие `/v2/task.create`; создание задачи передаёт структурированный `message.content`. Поля v1 `TaskMode`, `TaskDetail.Status`, `TaskListResponse.Data`, `FileResponse.ID` и `FileListResponse.Data` больше не применимы. Используйте соответственно `AgentStatus`, `Tasks`, `FileID` и `Files`.
+Версия 2 использует Manus API v2. Импорт должен оканчиваться на `/v2`; ключ передаётся в заголовке `x-manus-api-key`; вызовы идут на endpoints наподобие `/v2/task.create`; создание задачи передаёт структурированный `message.content`.
+
+> **Синхронизация с OpenAPI (v2.1.8):** актуальные поля API — `interactive_mode` и `enable_visible_in_task_list`. `EnableAskUser` и `HideInTaskList` остались как алиасы совместимости. `ListFiles` устарел: официальное API v2 не содержит endpoint `/v2/file.list`. Профили `speed` и `quality` также больше не являются допустимыми профилями v2.
 
 ## Лицензия
 
