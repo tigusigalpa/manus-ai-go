@@ -1,5 +1,20 @@
 # Manus AI Go SDK
 
+[![Tests](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/test.yml)
+[![Codecov](https://codecov.io/gh/tigusigalpa/manus-ai-go/branch/main/graph/badge.svg)](https://codecov.io/gh/tigusigalpa/manus-ai-go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/tigusigalpa/manus-ai-go/v2.svg)](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/tigusigalpa/manus-ai-go?logo=go)](go.mod)
+[![Latest Release](https://img.shields.io/github/v/release/tigusigalpa/manus-ai-go?display_name=tag&logo=github)](https://github.com/tigusigalpa/manus-ai-go/releases)
+[![License](https://img.shields.io/github/license/tigusigalpa/manus-ai-go?color=blue)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tigusigalpa/manus-ai-go)](https://goreportcard.com/report/github.com/tigusigalpa/manus-ai-go)
+[![Last Commit](https://img.shields.io/github/last-commit/tigusigalpa/manus-ai-go?logo=git)](https://github.com/tigusigalpa/manus-ai-go/commits/main)
+[![Commit Activity](https://img.shields.io/github/commit-activity/m/tigusigalpa/manus-ai-go?logo=github)](https://github.com/tigusigalpa/manus-ai-go/pulse)
+[![Open Issues](https://img.shields.io/github/issues/tigusigalpa/manus-ai-go?logo=github)](https://github.com/tigusigalpa/manus-ai-go/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/tigusigalpa/manus-ai-go?logo=github)](https://github.com/tigusigalpa/manus-ai-go/pulls)
+[![Stars](https://img.shields.io/github/stars/tigusigalpa/manus-ai-go?style=flat&logo=github)](https://github.com/tigusigalpa/manus-ai-go/stargazers)
+[![Forks](https://img.shields.io/github/forks/tigusigalpa/manus-ai-go?style=flat&logo=github)](https://github.com/tigusigalpa/manus-ai-go/network/members)
+[![Repo Size](https://img.shields.io/github/repo-size/tigusigalpa/manus-ai-go?logo=github)](https://github.com/tigusigalpa/manus-ai-go)
+
 A small, idiomatic Go client for the Manus API v2. It helps an application create and manage Manus tasks, continue a conversation, upload files, and process webhooks without hand-writing HTTP requests.
 
 [Русская версия](README-ru.md) · [Manus API documentation](https://open.manus.im/docs/v2/introduction) · [Package documentation](https://pkg.go.dev/github.com/tigusigalpa/manus-ai-go/v2)
@@ -275,7 +290,17 @@ if err != nil {
 }
 ```
 
-`AuthenticationError` represents 401 and 403 responses; `ValidationError` represents 400 responses; other HTTP and transport errors are represented by `ManusAIError`. Each error includes `StatusCode` when an HTTP response was received.
+`AuthenticationError` represents 401 and 403 responses; `ValidationError` represents 400 responses; other HTTP and transport errors are represented by `Error`. Each error includes `StatusCode` when an HTTP response was received.
+
+> **Breaking change:** the general error type was renamed from `ManusAIError` to `Error` to follow Go naming conventions. Update type assertions and `errors.As` targets accordingly:
+>
+> ```go
+> // Before
+> var apiErr *manusai.ManusAIError
+>
+> // Now
+> var apiErr *manusai.Error
+> ```
 
 ## API summary
 

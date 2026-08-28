@@ -1,5 +1,6 @@
 package manusai
 
+// TaskOptions configures a task created with Client.CreateTask.
 type TaskOptions struct {
 	AgentProfile    string        `json:"agent_profile,omitempty"`
 	Locale          string        `json:"locale,omitempty"`
@@ -14,6 +15,7 @@ type TaskOptions struct {
 	Attachments     []interface{} `json:"attachments,omitempty"`
 }
 
+// TaskResponse is the API response returned after creating a task.
 type TaskResponse struct {
 	OK              bool   `json:"ok"`
 	RequestID       string `json:"request_id"`
@@ -24,6 +26,7 @@ type TaskResponse struct {
 	ShareVisibility string `json:"share_visibility,omitempty"`
 }
 
+// TaskFilters narrows and paginates a task list request.
 type TaskFilters struct {
 	Cursor    string `json:"cursor,omitempty"`
 	Limit     int    `json:"limit,omitempty"`
@@ -33,6 +36,7 @@ type TaskFilters struct {
 	ProjectID string `json:"project_id,omitempty"`
 }
 
+// TaskListResponse is a paginated list of task summaries.
 type TaskListResponse struct {
 	OK         bool          `json:"ok"`
 	RequestID  string        `json:"request_id"`
@@ -41,6 +45,7 @@ type TaskListResponse struct {
 	NextCursor string        `json:"next_cursor,omitempty"`
 }
 
+// TaskSummary contains the list-view metadata for a task.
 type TaskSummary struct {
 	ID              string `json:"id"`
 	Title           string `json:"title"`
@@ -50,6 +55,7 @@ type TaskSummary struct {
 	UpdatedAt       int64  `json:"updated_at"`
 }
 
+// TaskDetail contains detailed metadata for a task.
 type TaskDetail struct {
 	OK              bool    `json:"ok"`
 	RequestID       string  `json:"request_id"`
@@ -62,6 +68,7 @@ type TaskDetail struct {
 	UpdatedAt       int64   `json:"updated_at"`
 }
 
+// TaskMessage represents one event or message in a task conversation.
 type TaskMessage struct {
 	ID               string                 `json:"id"`
 	Type             string                 `json:"type"`
@@ -72,18 +79,21 @@ type TaskMessage struct {
 	StatusUpdate     map[string]interface{} `json:"status_update,omitempty"`
 }
 
+// TaskUpdate specifies task properties to change.
 type TaskUpdate struct {
 	Title           *string `json:"title,omitempty"`
 	ShareVisibility *string `json:"share_visibility,omitempty"`
 	HideInTaskList  *bool   `json:"hide_in_task_list,omitempty"`
 }
 
+// DeleteResponse is returned after deleting a task or file.
 type DeleteResponse struct {
 	OK        bool   `json:"ok"`
 	RequestID string `json:"request_id"`
 	Deleted   bool   `json:"deleted"`
 }
 
+// FileResponse contains the upload information for a newly created file.
 type FileResponse struct {
 	OK        bool   `json:"ok"`
 	RequestID string `json:"request_id"`
@@ -93,6 +103,7 @@ type FileResponse struct {
 	ExpiresAt int64  `json:"expires_at"`
 }
 
+// FileListResponse is a paginated list of files.
 type FileListResponse struct {
 	OK         bool         `json:"ok"`
 	RequestID  string       `json:"request_id"`
@@ -101,6 +112,7 @@ type FileListResponse struct {
 	NextCursor string       `json:"next_cursor,omitempty"`
 }
 
+// FileDetail contains metadata for a Manus file.
 type FileDetail struct {
 	OK        bool   `json:"ok"`
 	RequestID string `json:"request_id,omitempty"`
@@ -112,22 +124,26 @@ type FileDetail struct {
 	ExpiresAt int64  `json:"expires_at"`
 }
 
+// WebhookConfig specifies the endpoint and events for a webhook.
 type WebhookConfig struct {
 	URL    string   `json:"url"`
 	Events []string `json:"events,omitempty"`
 }
 
+// WebhookResponse is returned after registering a webhook.
 type WebhookResponse struct {
 	OK        bool   `json:"ok"`
 	RequestID string `json:"request_id"`
 	WebhookID string `json:"webhook_id"`
 }
 
+// WebhookPayload is the decoded payload sent to a webhook endpoint.
 type WebhookPayload struct {
 	EventType  string                 `json:"event_type"`
 	TaskDetail map[string]interface{} `json:"task_detail,omitempty"`
 }
 
+// TaskAttachment represents a file attachment accepted by Manus task messages.
 type TaskAttachment struct {
 	Type     string `json:"type"`
 	FileID   string `json:"file_id,omitempty"`
@@ -136,6 +152,7 @@ type TaskAttachment struct {
 	MimeType string `json:"mime_type,omitempty"`
 }
 
+// TaskMessagesResponse is a paginated list of messages for a task.
 type TaskMessagesResponse struct {
 	OK         bool          `json:"ok"`
 	RequestID  string        `json:"request_id"`
@@ -145,16 +162,19 @@ type TaskMessagesResponse struct {
 	NextCursor string        `json:"next_cursor,omitempty"`
 }
 
+// SendMessageResponse is returned after sending a task message.
 type SendMessageResponse struct {
 	OK        bool   `json:"ok"`
 	RequestID string `json:"request_id"`
 }
 
+// StopTaskResponse is returned after requesting that a task stop.
 type StopTaskResponse struct {
 	OK        bool   `json:"ok"`
 	RequestID string `json:"request_id"`
 }
 
+// ConfirmActionResponse is returned after confirming a pending action.
 type ConfirmActionResponse struct {
 	OK        bool   `json:"ok"`
 	RequestID string `json:"request_id"`

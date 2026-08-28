@@ -11,12 +11,14 @@ import (
 	"time"
 )
 
+const testAPIKey = "test-api-key"
+
 func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 	t.Helper()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
-	client, err := NewClient("test-api-key", WithBaseURL(server.URL))
+	client, err := NewClient(testAPIKey, WithBaseURL(server.URL))
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
 	}
@@ -25,7 +27,7 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 
 func decodeBody(t *testing.T, r *http.Request) map[string]interface{} {
 	t.Helper()
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	var payload map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode request body: %v", err)
@@ -35,11 +37,11 @@ func decodeBody(t *testing.T, r *http.Request) map[string]interface{} {
 
 func TestNewClient(t *testing.T) {
 	t.Run("uses defaults", func(t *testing.T) {
-		client, err := NewClient("test-api-key")
+		client, err := NewClient(testAPIKey)
 		if err != nil {
 			t.Fatalf("NewClient() error = %v", err)
 		}
-		if client.apiKey != "test-api-key" || client.baseURL != DefaultBaseURL {
+		if client.apiKey != testAPIKey || client.baseURL != DefaultBaseURL {
 			t.Fatalf("unexpected client configuration: %#v", client)
 		}
 	})
@@ -57,7 +59,7 @@ func TestNewClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key := "test-api-key"
+			key := testAPIKey
 			if tt.name == "empty API key" {
 				key = ""
 			}
@@ -69,7 +71,7 @@ func TestNewClient(t *testing.T) {
 	}
 
 	t.Run("applies timeout after a nil HTTP client option", func(t *testing.T) {
-		client, err := NewClient("test-api-key", WithHTTPClient(nil), WithTimeout(time.Second))
+		client, err := NewClient(testAPIKey, WithHTTPClient(nil), WithTimeout(time.Second))
 		if err != nil {
 			t.Fatalf("NewClient() error = %v", err)
 		}
@@ -84,7 +86,7 @@ func TestCreateTaskBuildsV2Request(t *testing.T) {
 		if r.Method != http.MethodPost || r.URL.Path != "/v2/task.create" {
 			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("x-manus-api-key") != "test-api-key" {
+		if r.Header.Get("x-manus-api-key") != testAPIKey {
 			t.Fatal("API key header is missing")
 		}
 
@@ -115,7 +117,7 @@ func TestCreateTaskBuildsV2Request(t *testing.T) {
 }
 
 func TestCreateTaskValidatesInput(t *testing.T) {
-	client, err := NewClient("test-api-key")
+	client, err := NewClient(testAPIKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +203,7 @@ func TestUploadFileContentAndErrors(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
-	client, _ := NewClient("test-api-key")
+	client, _ := NewClient(testAPIKey)
 	if err := client.UploadFileContent(server.URL, []byte("content"), "text/plain"); err != nil {
 		t.Fatalf("UploadFileContent() error = %v", err)
 	}

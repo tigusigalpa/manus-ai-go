@@ -1,5 +1,6 @@
 package manusai
 
+// Agent profile identifiers accepted by Manus when creating a task.
 const (
 	AgentProfileManus16     = "manus-1.6"
 	AgentProfileManus16Lite = "manus-1.6-lite"
@@ -29,18 +30,21 @@ var (
 	}
 )
 
+// AllAgentProfiles returns a copy of every profile known to this SDK.
 func AllAgentProfiles() []string {
 	result := make([]string, len(allProfiles))
 	copy(result, allProfiles)
 	return result
 }
 
+// RecommendedAgentProfiles returns a copy of the current recommended profiles.
 func RecommendedAgentProfiles() []string {
 	result := make([]string, len(recommendedProfiles))
 	copy(result, recommendedProfiles)
 	return result
 }
 
+// IsValidAgentProfile reports whether profile is known to this SDK.
 func IsValidAgentProfile(profile string) bool {
 	for _, p := range allProfiles {
 		if p == profile {
@@ -50,6 +54,7 @@ func IsValidAgentProfile(profile string) bool {
 	return false
 }
 
+// IsDeprecatedAgentProfile reports whether profile is retained only for compatibility.
 func IsDeprecatedAgentProfile(profile string) bool {
 	for _, p := range deprecatedProfiles {
 		if p == profile {

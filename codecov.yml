@@ -1,0 +1,14 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 0%
+        informational: false
+        if_not_found: failure
+    patch:
+      default:
+        target: 80%
+        threshold: 0%
+        informational: false
+        if_not_found: failure

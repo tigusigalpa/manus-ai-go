@@ -1,38 +1,32 @@
-linters-settings:
-  govet:
-    check-shadowing: true
-  gocyclo:
-    min-complexity: 15
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 2
-    min-occurrences: 2
+version: "2"
 
 linters:
-  disable-all: true
+  default: none
   enable:
+    - dupl
     - errcheck
-    - gosimple
+    - goconst
+    - gocyclo
     - govet
     - ineffassign
-    - staticcheck
-    - typecheck
-    - unused
-    - gofmt
-    - goimports
     - misspell
+    - staticcheck
     - unconvert
     - unparam
-    - gocyclo
-    - dupl
-    - goconst
+    - unused
+  settings:
+    dupl:
+      threshold: 100
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    gocyclo:
+      min-complexity: 15
 
-issues:
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 run:
   timeout: 5m
-  tests: true

@@ -11,33 +11,40 @@ import (
 	"time"
 )
 
+// Default client settings.
 const (
 	DefaultBaseURL        = "https://api.manus.ai"
 	DefaultTimeout        = 30 * time.Second
 	DefaultConnectTimeout = 10 * time.Second
+	defaultContentType    = "application/octet-stream"
 	maxResponseBodySize   = 4 << 20 // 4 MiB
 )
 
+// Client is a Manus API v2 client.
 type Client struct {
 	apiKey     string
 	baseURL    string
 	httpClient *http.Client
 }
 
+// ClientOption configures a Client created by NewClient.
 type ClientOption func(*Client)
 
+// WithBaseURL overrides the Manus API base URL.
 func WithBaseURL(baseURL string) ClientOption {
 	return func(c *Client) {
 		c.baseURL = strings.TrimRight(baseURL, "/")
 	}
 }
 
+// WithHTTPClient uses httpClient to make API and file-upload requests.
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) {
 		c.httpClient = httpClient
 	}
 }
 
+// WithTimeout sets the overall timeout for requests made by the SDK client.
 func WithTimeout(timeout time.Duration) ClientOption {
 	return func(c *Client) {
 		if c.httpClient == nil {
@@ -47,6 +54,7 @@ func WithTimeout(timeout time.Duration) ClientOption {
 	}
 }
 
+// NewClient creates a Client using apiKey and optional configuration.
 func NewClient(apiKey string, opts ...ClientOption) (*Client, error) {
 	if strings.TrimSpace(apiKey) == "" {
 		return nil, &AuthenticationError{Message: "API key cannot be empty"}
@@ -82,11 +90,26 @@ func NewClient(apiKey string, opts ...ClientOption) (*Client, error) {
 	return client, nil
 }
 
+// CreateTask creates a Manus task from prompt and optional task configuration.
 func (c *Client) CreateTask(prompt string, options *TaskOptions) (*TaskResponse, error) {
 	if strings.TrimSpace(prompt) == "" {
 		return nil, &ValidationError{Message: "Task prompt cannot be empty"}
 	}
 
+	payload, err := newTaskPayload(prompt, options)
+	if err != nil {
+		return nil, err
+	}
+
+	var result TaskResponse
+	if err := c.request("POST", "/v2/task.create", payload, nil, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func newTaskPayload(prompt string, options *TaskOptions) (map[string]interface{}, error) {
 	message := map[string]interface{}{
 		"content": []map[string]interface{}{
 			{
@@ -100,59 +123,71 @@ func (c *Client) CreateTask(prompt string, options *TaskOptions) (*TaskResponse,
 		"message": message,
 	}
 
-	if options != nil {
-		if options.AgentProfile != "" {
-			payload["agent_profile"] = options.AgentProfile
-		}
-		if options.Locale != "" {
-			payload["locale"] = options.Locale
-		}
-		if options.HideInTaskList != nil {
-			payload["hide_in_task_list"] = *options.HideInTaskList
-		}
-		if options.ShareVisibility != "" {
-			payload["share_visibility"] = options.ShareVisibility
-		}
-		if options.Title != "" {
-			payload["title"] = options.Title
-		}
-		if options.ProjectID != "" {
-			payload["project_id"] = options.ProjectID
-		}
-		if options.EnableAskUser != nil {
-			payload["enable_ask_user"] = *options.EnableAskUser
-		}
-		if options.Connectors != nil && len(options.Connectors) > 0 {
-			message["connectors"] = options.Connectors
-		}
-		if options.EnableSkills != nil && len(options.EnableSkills) > 0 {
-			message["enable_skills"] = options.EnableSkills
-		}
-		if options.ForceSkills != nil && len(options.ForceSkills) > 0 {
-			message["force_skills"] = options.ForceSkills
-		}
-		if len(options.Attachments) > 0 {
-			for _, att := range options.Attachments {
-				attMap, ok := att.(map[string]interface{})
-				if !ok {
-					return nil, &ValidationError{Message: "Attachments must be created with an attachment helper or be map[string]interface{}"}
-				}
-				content := message["content"].([]map[string]interface{})
-				content = append(content, attMap)
-				message["content"] = content
-			}
-		}
+	if options == nil {
+		return payload, nil
 	}
 
-	var result TaskResponse
-	err := c.request("POST", "/v2/task.create", payload, nil, &result)
-	if err != nil {
+	if err := applyTaskOptions(payload, message, options); err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	return payload, nil
 }
 
+func applyTaskOptions(payload, message map[string]interface{}, options *TaskOptions) error {
+	if options.AgentProfile != "" {
+		payload["agent_profile"] = options.AgentProfile
+	}
+	if options.Locale != "" {
+		payload["locale"] = options.Locale
+	}
+	if options.HideInTaskList != nil {
+		payload["hide_in_task_list"] = *options.HideInTaskList
+	}
+	if options.ShareVisibility != "" {
+		payload["share_visibility"] = options.ShareVisibility
+	}
+	if options.Title != "" {
+		payload["title"] = options.Title
+	}
+	if options.ProjectID != "" {
+		payload["project_id"] = options.ProjectID
+	}
+	if options.EnableAskUser != nil {
+		payload["enable_ask_user"] = *options.EnableAskUser
+	}
+	if len(options.Connectors) > 0 {
+		message["connectors"] = options.Connectors
+	}
+	if len(options.EnableSkills) > 0 {
+		message["enable_skills"] = options.EnableSkills
+	}
+	if len(options.ForceSkills) > 0 {
+		message["force_skills"] = options.ForceSkills
+	}
+
+	attachments, err := appendAttachments(message["content"].([]map[string]interface{}), options.Attachments)
+	if err != nil {
+		return err
+	}
+	message["content"] = attachments
+
+	return nil
+}
+
+func appendAttachments(content []map[string]interface{}, attachments []interface{}) ([]map[string]interface{}, error) {
+	for _, attachment := range attachments {
+		attachmentMap, ok := attachment.(map[string]interface{})
+		if !ok {
+			return nil, &ValidationError{Message: "Attachments must be created with an attachment helper or be map[string]interface{}"}
+		}
+		content = append(content, attachmentMap)
+	}
+
+	return content, nil
+}
+
+// GetTasks returns tasks that match filters. A nil filter returns the default list.
 func (c *Client) GetTasks(filters *TaskFilters) (*TaskListResponse, error) {
 	query := url.Values{}
 
@@ -186,6 +221,7 @@ func (c *Client) GetTasks(filters *TaskFilters) (*TaskListResponse, error) {
 	return &result, nil
 }
 
+// GetTask returns task details for taskID.
 func (c *Client) GetTask(taskID string) (*TaskDetail, error) {
 	if strings.TrimSpace(taskID) == "" {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
@@ -203,6 +239,7 @@ func (c *Client) GetTask(taskID string) (*TaskDetail, error) {
 	return &result, nil
 }
 
+// UpdateTask updates the supported fields of taskID.
 func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, error) {
 	if strings.TrimSpace(taskID) == "" {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
@@ -243,6 +280,7 @@ func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, er
 	return &result, nil
 }
 
+// DeleteTask deletes taskID and returns the API deletion result.
 func (c *Client) DeleteTask(taskID string) (*DeleteResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
@@ -261,6 +299,7 @@ func (c *Client) DeleteTask(taskID string) (*DeleteResponse, error) {
 	return &result, nil
 }
 
+// CreateFile creates a Manus file record and returns its upload URL.
 func (c *Client) CreateFile(filename string) (*FileResponse, error) {
 	if strings.TrimSpace(filename) == "" {
 		return nil, &ValidationError{Message: "Filename cannot be empty"}
@@ -279,31 +318,32 @@ func (c *Client) CreateFile(filename string) (*FileResponse, error) {
 	return &result, nil
 }
 
+// UploadFileContent uploads fileContent to a URL returned by CreateFile.
 func (c *Client) UploadFileContent(uploadURL string, fileContent []byte, contentType string) error {
 	if strings.TrimSpace(uploadURL) == "" {
 		return &ValidationError{Message: "Upload URL cannot be empty"}
 	}
 
 	if contentType == "" {
-		contentType = "application/octet-stream"
+		contentType = defaultContentType
 	}
 
 	req, err := http.NewRequest("PUT", uploadURL, bytes.NewReader(fileContent))
 	if err != nil {
-		return &ManusAIError{Message: fmt.Sprintf("Failed to create upload request: %v", err)}
+		return &Error{Message: fmt.Sprintf("Failed to create upload request: %v", err)}
 	}
 
 	req.Header.Set("Content-Type", contentType)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return &ManusAIError{Message: fmt.Sprintf("Failed to upload file content: %v", err)}
+		return &Error{Message: fmt.Sprintf("Failed to upload file content: %v", err)}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		body, _ := readResponseBody(resp.Body)
-		return &ManusAIError{
+		return &Error{
 			Message:    fmt.Sprintf("Upload failed with status %d: %s", resp.StatusCode, string(body)),
 			StatusCode: resp.StatusCode,
 		}
@@ -312,6 +352,7 @@ func (c *Client) UploadFileContent(uploadURL string, fileContent []byte, content
 	return nil
 }
 
+// ListFiles returns files using optional cursor pagination.
 func (c *Client) ListFiles(limit int, cursor string) (*FileListResponse, error) {
 	query := url.Values{}
 	if limit > 0 {
@@ -330,6 +371,7 @@ func (c *Client) ListFiles(limit int, cursor string) (*FileListResponse, error) 
 	return &result, nil
 }
 
+// GetFile returns metadata for fileID.
 func (c *Client) GetFile(fileID string) (*FileDetail, error) {
 	if strings.TrimSpace(fileID) == "" {
 		return nil, &ValidationError{Message: "File ID cannot be empty"}
@@ -347,6 +389,7 @@ func (c *Client) GetFile(fileID string) (*FileDetail, error) {
 	return &result, nil
 }
 
+// DeleteFile deletes fileID and returns the API deletion result.
 func (c *Client) DeleteFile(fileID string) (*DeleteResponse, error) {
 	if strings.TrimSpace(fileID) == "" {
 		return nil, &ValidationError{Message: "File ID cannot be empty"}
@@ -365,6 +408,7 @@ func (c *Client) DeleteFile(fileID string) (*DeleteResponse, error) {
 	return &result, nil
 }
 
+// CreateWebhook registers a webhook using webhook configuration.
 func (c *Client) CreateWebhook(webhook *WebhookConfig) (*WebhookResponse, error) {
 	if webhook == nil {
 		return nil, &ValidationError{Message: "Webhook configuration cannot be nil"}
@@ -388,6 +432,7 @@ func (c *Client) CreateWebhook(webhook *WebhookConfig) (*WebhookResponse, error)
 	return &result, nil
 }
 
+// DeleteWebhook deletes the webhook identified by webhookID.
 func (c *Client) DeleteWebhook(webhookID string) error {
 	if strings.TrimSpace(webhookID) == "" {
 		return &ValidationError{Message: "Webhook ID cannot be empty"}
@@ -401,6 +446,7 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 	return err
 }
 
+// ListMessages returns messages for taskID using optional cursor pagination.
 func (c *Client) ListMessages(taskID string, limit int, cursor string, order string, verbose bool) (*TaskMessagesResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
@@ -431,6 +477,7 @@ func (c *Client) ListMessages(taskID string, limit int, cursor string, order str
 	return &result, nil
 }
 
+// SendMessage sends message and optional attachments to an existing task.
 func (c *Client) SendMessage(taskID string, message string, attachments []interface{}) (*SendMessageResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
@@ -472,6 +519,7 @@ func (c *Client) SendMessage(taskID string, message string, attachments []interf
 	return &result, nil
 }
 
+// StopTask requests that Manus stop the running task identified by taskID.
 func (c *Client) StopTask(taskID string) (*StopTaskResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
@@ -490,6 +538,7 @@ func (c *Client) StopTask(taskID string) (*StopTaskResponse, error) {
 	return &result, nil
 }
 
+// ConfirmAction submits input for a pending task action event.
 func (c *Client) ConfirmAction(taskID string, eventID string, input map[string]interface{}) (*ConfirmActionResponse, error) {
 	if strings.TrimSpace(taskID) == "" {
 		return nil, &ValidationError{Message: "Task ID cannot be empty"}
@@ -515,7 +564,7 @@ func (c *Client) ConfirmAction(taskID string, eventID string, input map[string]i
 
 func (c *Client) request(method, endpoint string, body interface{}, query url.Values, result interface{}) error {
 	fullURL := c.baseURL + endpoint
-	if query != nil && len(query) > 0 {
+	if len(query) > 0 {
 		fullURL += "?" + query.Encode()
 	}
 
@@ -523,14 +572,14 @@ func (c *Client) request(method, endpoint string, body interface{}, query url.Va
 	if body != nil {
 		jsonData, err := json.Marshal(body)
 		if err != nil {
-			return &ManusAIError{Message: fmt.Sprintf("Failed to marshal request body: %v", err)}
+			return &Error{Message: fmt.Sprintf("Failed to marshal request body: %v", err)}
 		}
 		reqBody = bytes.NewReader(jsonData)
 	}
 
 	req, err := http.NewRequest(method, fullURL, reqBody)
 	if err != nil {
-		return &ManusAIError{Message: fmt.Sprintf("Failed to create request: %v", err)}
+		return &Error{Message: fmt.Sprintf("Failed to create request: %v", err)}
 	}
 
 	req.Header.Set("x-manus-api-key", c.apiKey)
@@ -539,9 +588,9 @@ func (c *Client) request(method, endpoint string, body interface{}, query url.Va
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return &ManusAIError{Message: fmt.Sprintf("Request failed: %v", err)}
+		return &Error{Message: fmt.Sprintf("Request failed: %v", err)}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNoContent {
 		return nil
@@ -549,7 +598,7 @@ func (c *Client) request(method, endpoint string, body interface{}, query url.Va
 
 	respBody, err := readResponseBody(resp.Body)
 	if err != nil {
-		return &ManusAIError{Message: fmt.Sprintf("Failed to read response body: %v", err)}
+		return &Error{Message: fmt.Sprintf("Failed to read response body: %v", err)}
 	}
 
 	if resp.StatusCode >= 400 {
@@ -562,7 +611,7 @@ func (c *Client) request(method, endpoint string, body interface{}, query url.Va
 
 	if result != nil {
 		if err := json.Unmarshal(respBody, result); err != nil {
-			return &ManusAIError{Message: fmt.Sprintf("Failed to decode response: %v", err)}
+			return &Error{Message: fmt.Sprintf("Failed to decode response: %v", err)}
 		}
 	}
 
@@ -596,7 +645,7 @@ func (c *Client) handleErrorResponse(statusCode int, body []byte) error {
 			StatusCode: statusCode,
 		}
 	default:
-		return &ManusAIError{
+		return &Error{
 			Message:    fmt.Sprintf("API request failed: %s", message),
 			StatusCode: statusCode,
 		}
