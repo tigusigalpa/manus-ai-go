@@ -13,6 +13,12 @@
 coverage.html
 coverage.txt
 
+# Local Go build and test caches
+.gocache/
+.gotmp/
+coverage/
+test-results/
+
 # Dependency directories
 vendor/
 

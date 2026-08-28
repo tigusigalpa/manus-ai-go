@@ -1,4 +1,6 @@
-# Manus AI Go SDK
+# Manus AI Golang SDK
+
+![Manus API Golang SDK](https://i.postimg.cc/NfsBb6Td/manus-ai-golang-hero-banner.jpg)
 
 [![Tests](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/test.yml)
 [![CodeQL](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/manus-ai-go/actions/workflows/codeql.yml)
