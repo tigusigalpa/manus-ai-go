@@ -9,13 +9,16 @@ import (
 	"time"
 )
 
-const unixMillisecondsThreshold int64 = 100000000000
+const (
+	unixMillisecondsThreshold int64 = 100000000000
+	jsonNullValue                   = "null"
+)
 
 // parseTimestamp decodes the timestamp formats used by Manus API v2 and
 // normalizes them to Unix milliseconds.
 func parseTimestamp(raw json.RawMessage, field string) (int64, error) {
 	value := strings.TrimSpace(string(raw))
-	if value == "" || value == "null" {
+	if value == "" || value == jsonNullValue {
 		return 0, nil
 	}
 
@@ -55,7 +58,7 @@ func normalizeUnixMilliseconds(timestamp int64) int64 {
 
 func parseInteger(raw json.RawMessage, field string) (int64, error) {
 	value := strings.TrimSpace(string(raw))
-	if value == "" || value == "null" {
+	if value == "" || value == jsonNullValue {
 		return 0, nil
 	}
 	if strings.HasPrefix(value, "\"") {
