@@ -317,6 +317,8 @@ go test ./...
 
 > **Совместимость wire-формата (v2.2.1):** `GetTask` разбирает актуальный envelope `{ "task": { ... } }` и передаёт `task.status` в `TaskDetail.AgentStatus`. `ListMessages` принимает число, числовую строку и RFC3339 timestamp, сохраняя `TaskMessage.Timestamp` типом `int64`; RFC3339 нормализуется в Unix milliseconds.
 
+> **Совместимость timestamp (v2.2.2):** все timestamp-поля ответов SDK принимают JSON-число, числовую строку и RFC3339/RFC3339Nano, а публичные поля остаются `int64` в Unix milliseconds. Это относится к задачам, сообщениям, файлам, проектам, навыкам, вебхукам, использованию кредитов и сайтам.
+
 ## Лицензия
 
 [MIT](LICENSE).

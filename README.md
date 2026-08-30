@@ -335,6 +335,8 @@ Version 2 uses Manus API v2. Imports must end in `/v2`; requests use the `x-manu
 
 > **Wire-format compatibility (v2.2.1):** `GetTask` decodes the current `{ "task": { ... } }` envelope and exposes `task.status` through `TaskDetail.AgentStatus`. `ListMessages` accepts numeric, numeric-string, and RFC3339 timestamps while keeping `TaskMessage.Timestamp` as `int64`; RFC3339 values are normalized to Unix milliseconds.
 
+> **Timestamp compatibility (v2.2.2):** all SDK response timestamps accept JSON numbers, numeric strings, and RFC3339/RFC3339Nano strings while public fields remain `int64` Unix milliseconds. This includes task metadata, task messages, files, projects, skills, webhooks, usage, credits, and website responses.
+
 ## License
 
 Released under the [MIT License](LICENSE).

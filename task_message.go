@@ -1,17 +1,12 @@
 package manusai
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // UnmarshalJSON accepts the timestamp formats returned by Manus API v2 while
-// preserving Timestamp as a Unix timestamp for SDK users. Numeric timestamps
-// are retained as returned; RFC3339 timestamps are normalized to Unix milliseconds.
+// preserving Timestamp as Unix milliseconds for SDK users.
 func (m *TaskMessage) UnmarshalJSON(data []byte) error {
 	type taskMessageWire struct {
 		ID               string                 `json:"id"`
@@ -28,9 +23,9 @@ func (m *TaskMessage) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	timestamp, err := parseTaskMessageTimestamp(wire.Timestamp)
+	timestamp, err := parseTimestamp(wire.Timestamp, "task message timestamp")
 	if err != nil {
-		return fmt.Errorf("decode task message timestamp: %w", err)
+		return fmt.Errorf("decode task message: %w", err)
 	}
 
 	*m = TaskMessage{
@@ -43,37 +38,4 @@ func (m *TaskMessage) UnmarshalJSON(data []byte) error {
 		StatusUpdate:     wire.StatusUpdate,
 	}
 	return nil
-}
-
-func parseTaskMessageTimestamp(raw json.RawMessage) (int64, error) {
-	value := strings.TrimSpace(string(raw))
-	if value == "" || value == "null" {
-		return 0, nil
-	}
-
-	if strings.HasPrefix(value, "\"") {
-		var text string
-		if err := json.Unmarshal(raw, &text); err != nil {
-			return 0, fmt.Errorf("invalid string value %s", value)
-		}
-		if timestamp, err := strconv.ParseInt(text, 10, 64); err == nil {
-			return timestamp, nil
-		}
-		if timestamp, err := time.Parse(time.RFC3339Nano, text); err == nil {
-			return timestamp.UnixMilli(), nil
-		}
-		return 0, fmt.Errorf("%q is not a Unix timestamp or RFC3339 timestamp", text)
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-	var number json.Number
-	if err := decoder.Decode(&number); err != nil {
-		return 0, fmt.Errorf("%s is not a JSON number or string", value)
-	}
-	timestamp, err := strconv.ParseInt(number.String(), 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("%q is not an integer Unix timestamp", number.String())
-	}
-	return timestamp, nil
 }

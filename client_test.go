@@ -313,9 +313,9 @@ func TestGetTaskDecodesV2Envelope(t *testing.T) {
 		}
 		_, _ = io.WriteString(w, `{
 			"ok": true,
-			"request_id": "req_123",
+			"request_id": "request-1",
 			"task": {
-				"id": "task_123",
+				"id": "task-1",
 				"status": "running",
 				"title": "Research",
 				"task_type": "standard",
@@ -323,8 +323,8 @@ func TestGetTaskDecodesV2Envelope(t *testing.T) {
 				"credit_usage": 12,
 				"task_url": "https://manus.im/app/task_123",
 				"agent_profile": "manus-1.6",
-				"created_at": 1700000000,
-				"updated_at": 1700000010
+				"created_at": "2026-08-30T16:04:01.419Z",
+				"updated_at": "1725033841419"
 			}
 		}`)
 	})
@@ -333,8 +333,40 @@ func TestGetTaskDecodesV2Envelope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask() error = %v", err)
 	}
-	if task.RequestID != "req_123" || task.ID != "task_123" || task.AgentStatus != "running" || task.TaskType != "standard" || task.AgentProfile != "manus-1.6" {
+	if task.RequestID != "request-1" || task.ID != "task-1" || task.AgentStatus != "running" || task.TaskType != "standard" || task.AgentProfile != "manus-1.6" || task.CreatedAt != 1788105841419 || task.UpdatedAt != 1725033841419 {
 		t.Fatalf("GetTask() = %#v", task)
+	}
+}
+
+func TestGetTaskDecodesNumericAndInvalidTimestamps(t *testing.T) {
+	tests := []struct {
+		name          string
+		createdAt     string
+		updatedAt     string
+		wantCreatedAt int64
+		wantError     string
+	}{
+		{"JSON numbers", `1725033841`, `1725033841419`, 1725033841000, ""},
+		{"numeric strings", `"1725033841"`, `"1725033841419"`, 1725033841000, ""},
+		{"invalid timestamp", `"not-a-timestamp"`, `1725033841419`, 0, "task.created_at"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.WriteString(w, `{"ok":true,"task":{"id":"task-1","status":"running","created_at":`+tt.createdAt+`,"updated_at":`+tt.updatedAt+`}}`)
+			})
+			task, err := client.GetTask("task-1")
+			if tt.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("GetTask() error = %v, want %q", err, tt.wantError)
+				}
+				return
+			}
+			if err != nil || task.CreatedAt != tt.wantCreatedAt || task.UpdatedAt != 1725033841419 {
+				t.Fatalf("GetTask() = (%#v, %v)", task, err)
+			}
+		})
 	}
 }
 
@@ -394,7 +426,7 @@ func TestListMessagesRejectsInvalidTimestamp(t *testing.T) {
 		_, _ = io.WriteString(w, `{"ok":true,"task_id":"task_123","messages":[{"id":"event_123","timestamp":"not-a-timestamp"}]}`)
 	})
 	_, err := client.ListMessages("task_123", 10, "", "desc", false)
-	if err == nil || !strings.Contains(err.Error(), "decode task message timestamp") {
+	if err == nil || !strings.Contains(err.Error(), "task message timestamp") {
 		t.Fatalf("ListMessages() error = %v, want descriptive timestamp decoding error", err)
 	}
 }

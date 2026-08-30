@@ -368,19 +368,23 @@ func (c *Client) CreateFile(filename string) (*FileResponse, error) {
 		OK        bool   `json:"ok"`
 		RequestID string `json:"request_id"`
 		File      struct {
-			ID        string `json:"id"`
-			Filename  string `json:"filename"`
-			Status    string `json:"status"`
-			CreatedAt int64  `json:"created_at"`
+			ID        string          `json:"id"`
+			Filename  string          `json:"filename"`
+			Status    string          `json:"status"`
+			CreatedAt json.RawMessage `json:"created_at"`
 		} `json:"file"`
-		UploadURL       string `json:"upload_url"`
-		UploadExpiresAt int64  `json:"upload_expires_at"`
+		UploadURL       string          `json:"upload_url"`
+		UploadExpiresAt json.RawMessage `json:"upload_expires_at"`
 	}
 	err := c.request("POST", "/v2/file.upload", payload, nil, &response)
 	if err != nil {
 		return nil, err
 	}
-	return &FileResponse{OK: response.OK, RequestID: response.RequestID, FileID: response.File.ID, Filename: response.File.Filename, UploadURL: response.UploadURL, ExpiresAt: response.UploadExpiresAt}, nil
+	uploadExpiresAt, err := parseTimestamp(response.UploadExpiresAt, "file.upload_expires_at")
+	if err != nil {
+		return nil, &Error{Message: fmt.Sprintf("Failed to decode response: %v", err)}
+	}
+	return &FileResponse{OK: response.OK, RequestID: response.RequestID, FileID: response.File.ID, Filename: response.File.Filename, UploadURL: response.UploadURL, ExpiresAt: uploadExpiresAt}, nil
 }
 
 // UploadFileContent uploads fileContent to a URL returned by CreateFile.
@@ -435,19 +439,27 @@ func (c *Client) GetFile(fileID string) (*FileDetail, error) {
 		OK        bool   `json:"ok"`
 		RequestID string `json:"request_id"`
 		File      struct {
-			ID        string `json:"id"`
-			Filename  string `json:"filename"`
-			Status    string `json:"status"`
-			Bytes     int64  `json:"bytes"`
-			CreatedAt int64  `json:"created_at"`
-			ExpiresAt int64  `json:"expires_at"`
+			ID        string          `json:"id"`
+			Filename  string          `json:"filename"`
+			Status    string          `json:"status"`
+			Bytes     int64           `json:"bytes"`
+			CreatedAt json.RawMessage `json:"created_at"`
+			ExpiresAt json.RawMessage `json:"expires_at"`
 		} `json:"file"`
 	}
 	err := c.request("GET", "/v2/file.detail", nil, query, &response)
 	if err != nil {
 		return nil, err
 	}
-	return &FileDetail{OK: response.OK, RequestID: response.RequestID, FileID: response.File.ID, Filename: response.File.Filename, Status: response.File.Status, SizeBytes: response.File.Bytes, CreatedAt: response.File.CreatedAt, ExpiresAt: response.File.ExpiresAt}, nil
+	createdAt, err := parseTimestamp(response.File.CreatedAt, "file.created_at")
+	if err != nil {
+		return nil, &Error{Message: fmt.Sprintf("Failed to decode response: %v", err)}
+	}
+	expiresAt, err := parseTimestamp(response.File.ExpiresAt, "file.expires_at")
+	if err != nil {
+		return nil, &Error{Message: fmt.Sprintf("Failed to decode response: %v", err)}
+	}
+	return &FileDetail{OK: response.OK, RequestID: response.RequestID, FileID: response.File.ID, Filename: response.File.Filename, Status: response.File.Status, SizeBytes: response.File.Bytes, CreatedAt: createdAt, ExpiresAt: expiresAt}, nil
 }
 
 // DeleteFile deletes fileID and returns the API deletion result.
