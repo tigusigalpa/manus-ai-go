@@ -315,6 +315,8 @@ go test ./...
 
 > **Синхронизация с OpenAPI (v2.1.8):** актуальные поля API — `interactive_mode` и `enable_visible_in_task_list`. `EnableAskUser` и `HideInTaskList` остались как алиасы совместимости. `ListFiles` устарел: официальное API v2 не содержит endpoint `/v2/file.list`. Профили `speed` и `quality` также больше не являются допустимыми профилями v2.
 
+> **Совместимость wire-формата (v2.2.1):** `GetTask` разбирает актуальный envelope `{ "task": { ... } }` и передаёт `task.status` в `TaskDetail.AgentStatus`. `ListMessages` принимает число, числовую строку и RFC3339 timestamp, сохраняя `TaskMessage.Timestamp` типом `int64`; RFC3339 нормализуется в Unix milliseconds.
+
 ## Лицензия
 
 [MIT](LICENSE).

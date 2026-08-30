@@ -262,21 +262,21 @@ func TestTaskAndFileRequests(t *testing.T) {
 		{"list tasks", func(c *Client) error {
 			_, err := c.GetTasks(&TaskFilters{Limit: 10, Order: "desc", Scope: "all"})
 			return err
-		}, http.MethodGet, "/v2/task.list", url.Values{"limit": {"10"}, "order": {"desc"}, "scope": {"all"}}, `{"ok":true,"tasks":[]}`},
-		{"get task", func(c *Client) error { _, err := c.GetTask("task_123"); return err }, http.MethodGet, "/v2/task.detail", url.Values{"task_id": {"task_123"}}, `{"ok":true,"id":"task_123","agent_status":"running"}`},
+		}, http.MethodGet, "/v2/task.list", url.Values{"limit": {"10"}, "order": {"desc"}, "scope": {"all"}}, `{"ok":true,"data":[]}`},
+		{"get task", func(c *Client) error { _, err := c.GetTask("task_123"); return err }, http.MethodGet, "/v2/task.detail", url.Values{"task_id": {"task_123"}}, `{"ok":true,"task":{"id":"task_123","status":"running"}}`},
 		{"update task", func(c *Client) error {
 			title := "New title"
 			_, err := c.UpdateTask("task_123", &TaskUpdate{Title: &title})
 			return err
-		}, http.MethodPost, "/v2/task.update", nil, `{"ok":true,"id":"task_123"}`},
+		}, http.MethodPost, "/v2/task.update", nil, `{"ok":true,"task_id":"task_123","task_title":"New title"}`},
 		{"delete task", func(c *Client) error { _, err := c.DeleteTask("task_123"); return err }, http.MethodPost, "/v2/task.delete", nil, `{"ok":true,"deleted":true}`},
-		{"create file", func(c *Client) error { _, err := c.CreateFile("report.pdf"); return err }, http.MethodPost, "/v2/file.upload", nil, `{"ok":true,"file_id":"file_123"}`},
-		{"get file", func(c *Client) error { _, err := c.GetFile("file_123"); return err }, http.MethodGet, "/v2/file.detail", url.Values{"file_id": {"file_123"}}, `{"ok":true,"file_id":"file_123"}`},
+		{"create file", func(c *Client) error { _, err := c.CreateFile("report.pdf"); return err }, http.MethodPost, "/v2/file.upload", nil, `{"ok":true,"file":{"id":"file_123","filename":"report.pdf"},"upload_url":"https://upload.example.com"}`},
+		{"get file", func(c *Client) error { _, err := c.GetFile("file_123"); return err }, http.MethodGet, "/v2/file.detail", url.Values{"file_id": {"file_123"}}, `{"ok":true,"file":{"id":"file_123","filename":"report.pdf","status":"uploaded"}}`},
 		{"delete file", func(c *Client) error { _, err := c.DeleteFile("file_123"); return err }, http.MethodPost, "/v2/file.delete", nil, `{"ok":true,"deleted":true}`},
 		{"create webhook", func(c *Client) error {
 			_, err := c.CreateWebhook(&WebhookConfig{URL: "https://example.com/hook", Events: []string{"task_stopped"}})
 			return err
-		}, http.MethodPost, "/v2/webhook.create", nil, `{"ok":true,"webhook_id":"webhook_123"}`},
+		}, http.MethodPost, "/v2/webhook.create", nil, `{"ok":true,"webhook":{"id":"webhook_123"}}`},
 		{"delete webhook", func(c *Client) error { return c.DeleteWebhook("webhook_123") }, http.MethodPost, "/v2/webhook.delete", nil, ""},
 		{"list messages", func(c *Client) error { _, err := c.ListMessages("task_123", 10, "next", "desc", true); return err }, http.MethodGet, "/v2/task.listMessages", url.Values{"task_id": {"task_123"}, "limit": {"10"}, "cursor": {"next"}, "order": {"desc"}, "verbose": {"true"}}, `{"ok":true,"messages":[]}`},
 		{"send message", func(c *Client) error { _, err := c.SendMessage("task_123", "Continue", nil); return err }, http.MethodPost, "/v2/task.sendMessage", nil, `{"ok":true}`},
@@ -303,6 +303,99 @@ func TestTaskAndFileRequests(t *testing.T) {
 				t.Fatalf("request error = %v", err)
 			}
 		})
+	}
+}
+
+func TestGetTaskDecodesV2Envelope(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v2/task.detail" || r.URL.Query().Get("task_id") != "task_123" {
+			t.Fatalf("unexpected request: %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = io.WriteString(w, `{
+			"ok": true,
+			"request_id": "req_123",
+			"task": {
+				"id": "task_123",
+				"status": "running",
+				"title": "Research",
+				"task_type": "standard",
+				"share_visibility": "private",
+				"credit_usage": 12,
+				"task_url": "https://manus.im/app/task_123",
+				"agent_profile": "manus-1.6",
+				"created_at": 1700000000,
+				"updated_at": 1700000010
+			}
+		}`)
+	})
+
+	task, err := client.GetTask("task_123")
+	if err != nil {
+		t.Fatalf("GetTask() error = %v", err)
+	}
+	if task.RequestID != "req_123" || task.ID != "task_123" || task.AgentStatus != "running" || task.TaskType != "standard" || task.AgentProfile != "manus-1.6" {
+		t.Fatalf("GetTask() = %#v", task)
+	}
+}
+
+func TestListMessagesDecodesV2Timestamps(t *testing.T) {
+	rfc3339Timestamp := "2026-08-30T12:34:56.789Z"
+	tests := []struct {
+		name          string
+		timestampJSON string
+		wantTimestamp int64
+	}{
+		{"number", `1700000000123`, 1700000000123},
+		{"numeric string", `"1700000000123"`, 1700000000123},
+		{"RFC3339 string", `"2026-08-30T12:34:56.789Z"`, 1788093296789},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet || r.URL.Path != "/v2/task.listMessages" || r.URL.Query().Get("task_id") != "task_123" {
+					t.Fatalf("unexpected request: %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+				}
+				response := `{
+					"ok": true,
+					"request_id": "req_messages",
+					"task_id": "task_123",
+					"messages": [{
+						"id": "event_123",
+						"type": "status_update",
+						"timestamp": ` + tt.timestampJSON + `,
+						"status_update": {"agent_status":"running","brief":"Working"},
+						"assistant_message": {"content":"I am working on it."}
+					}]
+				}`
+				_, _ = io.WriteString(w, response)
+			})
+
+			messages, err := client.ListMessages("task_123", 10, "", "desc", false)
+			if err != nil {
+				t.Fatalf("ListMessages() error = %v", err)
+			}
+			if len(messages.Messages) != 1 || messages.Messages[0].Timestamp != tt.wantTimestamp {
+				t.Fatalf("messages = %#v, want timestamp %d", messages.Messages, tt.wantTimestamp)
+			}
+			if messages.Messages[0].StatusUpdate["agent_status"] != "running" || messages.Messages[0].AssistantMessage["content"] != "I am working on it." {
+				t.Fatalf("message payload was not decoded: %#v", messages.Messages[0])
+			}
+		})
+	}
+
+	if got, err := time.Parse(time.RFC3339Nano, rfc3339Timestamp); err != nil || got.UnixMilli() != 1788093296789 {
+		t.Fatalf("test fixture timestamp is invalid: %v", err)
+	}
+}
+
+func TestListMessagesRejectsInvalidTimestamp(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"ok":true,"task_id":"task_123","messages":[{"id":"event_123","timestamp":"not-a-timestamp"}]}`)
+	})
+	_, err := client.ListMessages("task_123", 10, "", "desc", false)
+	if err == nil || !strings.Contains(err.Error(), "decode task message timestamp") {
+		t.Fatalf("ListMessages() error = %v, want descriptive timestamp decoding error", err)
 	}
 }
 

@@ -39,6 +39,12 @@ type Client struct {
 	httpClient  *http.Client
 }
 
+type taskDetailResponse struct {
+	OK        bool        `json:"ok"`
+	RequestID string      `json:"request_id"`
+	Task      TaskSummary `json:"task"`
+}
+
 // ClientOption configures a Client created by NewClient.
 type ClientOption func(*Client)
 
@@ -264,11 +270,7 @@ func (c *Client) GetTask(taskID string) (*TaskDetail, error) {
 	query := url.Values{}
 	query.Set(taskIDField, taskID)
 
-	var response struct {
-		OK        bool        `json:"ok"`
-		RequestID string      `json:"request_id"`
-		Task      TaskSummary `json:"task"`
-	}
+	var response taskDetailResponse
 	err := c.request("GET", "/v2/task.detail", nil, query, &response)
 	if err != nil {
 		return nil, err
@@ -276,7 +278,8 @@ func (c *Client) GetTask(taskID string) (*TaskDetail, error) {
 	return &TaskDetail{
 		OK: response.OK, RequestID: response.RequestID, ID: response.Task.ID, Title: response.Task.Title,
 		AgentStatus: response.Task.AgentStatus, ShareVisibility: response.Task.ShareVisibility,
-		CreditUsage: response.Task.CreditUsage, TaskURL: response.Task.TaskURL, CreatedAt: response.Task.CreatedAt, UpdatedAt: response.Task.UpdatedAt,
+		CreditUsage: response.Task.CreditUsage, TaskURL: response.Task.TaskURL, TaskType: response.Task.TaskType,
+		AgentProfile: response.Task.AgentProfile, CreatedAt: response.Task.CreatedAt, UpdatedAt: response.Task.UpdatedAt,
 	}, nil
 }
 
@@ -317,13 +320,19 @@ func (c *Client) UpdateTask(taskID string, updates *TaskUpdate) (*TaskDetail, er
 		return nil, &ValidationError{Message: "No valid update fields provided"}
 	}
 
-	var result TaskDetail
-	err := c.request("POST", "/v2/task.update", payload, nil, &result)
+	var response struct {
+		OK              bool   `json:"ok"`
+		RequestID       string `json:"request_id"`
+		TaskID          string `json:"task_id"`
+		TaskTitle       string `json:"task_title"`
+		TaskURL         string `json:"task_url"`
+		ShareVisibility string `json:"share_visibility"`
+	}
+	err := c.request("POST", "/v2/task.update", payload, nil, &response)
 	if err != nil {
 		return nil, err
 	}
-
-	return &result, nil
+	return &TaskDetail{OK: response.OK, RequestID: response.RequestID, ID: response.TaskID, Title: response.TaskTitle, TaskURL: response.TaskURL, ShareVisibility: response.ShareVisibility}, nil
 }
 
 // DeleteTask deletes taskID and returns the API deletion result.

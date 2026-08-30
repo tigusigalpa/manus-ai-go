@@ -59,6 +59,8 @@ type TaskSummary struct {
 	ShareVisibility string  `json:"share_visibility"`
 	CreditUsage     float64 `json:"credit_usage"`
 	TaskURL         string  `json:"task_url,omitempty"`
+	TaskType        string  `json:"task_type,omitempty"`
+	AgentProfile    string  `json:"agent_profile,omitempty"`
 	CreatedAt       int64   `json:"created_at"`
 	UpdatedAt       int64   `json:"updated_at"`
 }
@@ -73,6 +75,8 @@ type TaskDetail struct {
 	ShareVisibility string  `json:"share_visibility"`
 	CreditUsage     float64 `json:"credit_usage"`
 	TaskURL         string  `json:"task_url,omitempty"`
+	TaskType        string  `json:"task_type,omitempty"`
+	AgentProfile    string  `json:"agent_profile,omitempty"`
 	CreatedAt       int64   `json:"created_at"`
 	UpdatedAt       int64   `json:"updated_at"`
 }

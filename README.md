@@ -333,6 +333,8 @@ Version 2 uses Manus API v2. Imports must end in `/v2`; requests use the `x-manu
 
 > **OpenAPI alignment (v2.1.8):** `interactive_mode` and `enable_visible_in_task_list` are the current API fields. `EnableAskUser` and `HideInTaskList` remain as compatibility aliases. `ListFiles` is deprecated because the official v2 API has no `/v2/file.list` endpoint. The legacy `speed` and `quality` agent profiles are likewise no longer sent as valid v2 profiles.
 
+> **Wire-format compatibility (v2.2.1):** `GetTask` decodes the current `{ "task": { ... } }` envelope and exposes `task.status` through `TaskDetail.AgentStatus`. `ListMessages` accepts numeric, numeric-string, and RFC3339 timestamps while keeping `TaskMessage.Timestamp` as `int64`; RFC3339 values are normalized to Unix milliseconds.
+
 ## License
 
 Released under the [MIT License](LICENSE).

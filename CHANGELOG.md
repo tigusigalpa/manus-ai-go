@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-08-30
+
+### Fixed
+- Decode Manus API v2 `task.detail` responses from their nested `task` envelope and populate `TaskDetail.AgentStatus` from `task.status`.
+- Add `TaskDetail.TaskURL`, `TaskDetail.TaskType`, and `TaskDetail.AgentProfile` without removing existing fields.
+- Decode `task.listMessages` timestamps sent as JSON numbers, numeric strings, or RFC3339/RFC3339Nano strings. RFC3339 values are normalized to Unix milliseconds.
+- Return a descriptive decoding error for invalid message timestamps instead of a raw JSON type mismatch.
+
+### Tests
+- Add regression coverage for production `task.detail` and `task.listMessages` response payloads.
+
 ## [1.0.0] - 2025-01-XX
 
 ### Added
@@ -33,5 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Webhook event handlers (task created, stopped, completed, asking for input)
 - Comprehensive examples (basic usage, file upload, webhooks)
 
-[Unreleased]: https://github.com/tigusigalpa/manus-ai-go/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/tigusigalpa/manus-ai-go/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/tigusigalpa/manus-ai-go/compare/v2.2.0...v2.2.1
 [1.0.0]: https://github.com/tigusigalpa/manus-ai-go/releases/tag/v1.0.0
